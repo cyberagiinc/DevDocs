@@ -2,7 +2,7 @@
 ![image](https://github.com/user-attachments/assets/fe646224-bcd8-44ac-9631-08f96f6c07d1)
 
 
-## Tech documenations suck, we just made it easier for you to digest it inside your LLM. 
+## Tech documentation suck, we just made it easier for you to digest it inside your LLM. 
 
 The idea of DevDocs is to ensure that software engineers and (LLM) software devs dont have to go through copious amount of tech documentation just to implement the tech. 
 
