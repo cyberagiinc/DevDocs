@@ -12,14 +12,14 @@ The idea of DevDocs is to ensure that software engineers and (LLM) software devs
 
 **Goal:** I wanted to use state of the art technology but wanted the speed of an up to date LLM, cant do that without an hashtag#MCP(model context protocol) server. So now if I wanted to implement a vector database into my code, I just copy the URL, paste it in DevDocs and the tool grabs all the data from its child websites and spits it into markdown which is then uploaded into my MCP server for Claude to use. This cuts down weeks of research into just a bunch of questions. 
 
-## Roadmap:
+## Feature Roadmap:
 - [X] ~~Build a Minimum Viable Product with accurate functionality~~
-- [ ] Handle Complex websites documentation like AWS, MS, langchain :D 
+- [X] ~~Handle Complex websites documentation like AWS, MS, langchain~~
 - [X] ~~Adding MCP servers options to choose.~~
 - [ ] Turnkey Vector Database so all chunking, embedding is done behind the scenes while you sip your joe :) 
 - [ ] Agents which will be pros in particular documentation and can code, architect or reason for you with the accurate information as ground truth.
 - [ ] Option to switch to LLM based crawling for specific usecase.
-- [ ] UI Improvements, cuz we flashy. 
+- [ ] Dockerization for easier deployment in production.
 
 
 ![image](https://github.com/user-attachments/assets/8bdc3dfe-1fb9-4ace-8259-e6155f44ebcd)
@@ -34,7 +34,7 @@ The idea of DevDocs is to ensure that software engineers and (LLM) software devs
 - 🚄 **Real-time Progress**: Live updates on crawling progress and statistics
 - 💫 **Modern UI**: Sleek, responsive interface with real-time feedback
 - 🔥 **Inbuilt MCP Server**: No need to copy paste into your MCP server, DevDocs already has an inbuild MCP server, already connect to your claude desktop app upon installation(restart needed) and gives you the commands you need to add to your cline MCP server configs. How cool is that? 
-- 📕 **MCP Server:Section Based Document Retrival**: Efficiently navigate and load large markdown documents with section-based retrieval, preventing token limit issues while maintaining document structure. Check out the How to use DevDocs MCP Server in Cline below. 
+- 📕 **MCP Server: Section Based Document Retrival**: Efficiently navigate and load large markdown documents with section-based retrieval, preventing token limit issues while maintaining document structure. Check out the How to use DevDocs MCP Server in Cline below. 
 
 ## 🚀 Getting Started
 
@@ -65,10 +65,89 @@ That's it! The system will:
 5. Download the generated markdown/json or use it with an inbuilt MCP server with Cline/Claude
 
 ## 📕 How to use DevDocs MCP Server in Cline
-1. Once your documents are extracted via the UI, navigate to your code editor of choice (Roo Code or Cline.)
-2. In Cline Type: `Read the files in MCP server and tell me how to (your question) and use Table of Contents and Section Access to answer` 
 
-    *Note: This feature is not activated by default, we are working on it, meanwhile use the #2 format in the chat to invoke this feature*
+With the new features added to DevDocs for **MCP Server: Section Based Document Retrival**
+you can create a mode in Roo Code to incorporate efficient retrieval of information from your crawled documents in MCP server. This guide walks you through setting up **Research_MCP** mode in just 3 steps!!
+
+---
+
+### 1. Setting Up the Mode
+
+1. **Open the “Modes” Interface**  
+   - In **Roo Code**, click the **+** to create a new mode, or select an existing mode (like `Research_MCP`) to edit.
+2. **Name and Slug**  
+   - Give the mode a **Name** (e.g., `Research_MCP`).  
+   - Provide a **Slug** (e.g., `research-mcp`). The slug must be lowercase letters, numbers, and hyphens only.
+
+![alt text](image-2.png)
+---
+
+### 2. Role Definition
+
+Paste the following prompt exactly into the **Role Definition** field:
+
+```Agent Identity: You are a Research_MCP agent, specialized in navigating and retrieving technical documentation from the MCP server.
+
+Expertise and Personality: Expertise: Developer documentation retrieval, technical synthesis, and documentation search. Personality: Systematic, detail-oriented, and precise. Provide well-structured answers with clear references to documentation sections.
+
+Behavioral Mandate: Always use the Table Of Contents and Section Access tools when addressing any query regarding the MCP documentation. Maintain clarity, accuracy, and traceability in your responses.
+```
+
+---
+
+### 3. Custom Instructions
+
+Paste the following instruction prompt exactly into the **Custom Instructions** field:
+
+```Objective: The agent must provide accurate and complete responses by retrieving information from the MCP server’s developer documentation (Markdown format). It must always utilize the two available tools: 
+1. Table Of Contents Tool: Returns a full or filtered list of documentation topics. 
+2. Section Access Tool: Retrieves the detailed content of specific documentation sections.
+
+General Process: Query Interpretation: Parse the user's query to extract key topics, keywords, and context. Identify the likely relevant sections (e.g., API configurations, error handling) from the query.
+
+Discovery via Table Of Contents: Use the Table Of Contents tool to search the documentation index for relevant sections. Filter or scan titles and metadata for matching keywords.
+
+Drill-Down Using Section Access: For each identified relevant document or section, use the Section Access tool to retrieve its content. If multiple parts are needed, request all related sections to ensure comprehensive coverage.
+
+Synthesis and Response Formation: Combine the retrieved content into a coherent and complete answer. Reference section identifiers or document paths for traceability. Validate that every aspect of the query has been addressed.
+
+Error Handling: If no matching sections are found, adjust the search parameters and retry. Clearly report if the query remains ambiguous or if no relevant documentation is available.
+
+Mandatory Tool Usage: 
+Enforcement: Every time a query is received that requires information from the MCP server docs, the agent MUST first query the Table Of Contents tool to list potential relevant topics, then use the Section Access tool to retrieve the necessary detailed content.
+
+Search & Retrieve Workflow: 
+Interpret and Isolate: Identify the key terms and data points from the user’s query.
+
+Index Lookup: Immediately query the Table Of Contents tool to obtain a list of relevant documentation sections.
+
+Targeted Retrieval: For each promising section, use the Section Access tool to get complete content.
+
+Information Synthesis: Merge the retrieved content, ensuring all necessary details are included and clearly referenced.
+
+Fallback and Clarification: If initial searches yield insufficient data, adjust the query parameters and retrieve additional sections as needed.
+
+Custom Instruction Loading: Additional custom instructions specific to Research_MCP mode may be loaded from the .clinerules-research-mcp file in your workspace. These may include further refinements or constraints based on evolving documentation structures or query types.
+
+Final Output Construction: The final answer should be organized, directly address the query, and include clear pointers (e.g., section names or identifiers) back to the MCP documentation. Ensure minimal redundancy while covering all necessary details.
+```
+
+---
+
+### 4. Using Your Research_MCP Mode
+
+![alt text](image-3.png)
+- When you switch to or invoke the **Research_MCP** mode in Roo Code, the agent will:
+  1. **Check the Table Of Contents** for any relevant sections.  
+  2. **Use Section Access** to retrieve the detailed content from those sections.  
+  3. **Synthesize** a coherent, complete, and traceable answer.  
+
+- If no relevant sections are found, it will **broaden the search** or notify you of ambiguities.  
+
+---
+This specialized agent will systematically search and retrieve information from your MCP server’s developer documentation, ensuring comprehensive answers to your technical queries.
+
+
 ## 🤝 Contributing
 
 1. Fork the repository
