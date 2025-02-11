@@ -134,7 +134,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-      <header className="w-full py-8 bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border-b border-gray-700">
+      <header className="w-full py-12 bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-4">
             DevDocs
@@ -142,6 +142,7 @@ export default function Home() {
           <p className="text-gray-300 text-lg max-w-2xl mx-auto">
             Discover and extract documentation for quicker development
           </p>
+          <p className="text-sm text-gray-400 mt-2">by CyberAGI Inc</p>
         </div>
       </header>
 
@@ -189,6 +190,21 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <footer className="py-8 text-center text-gray-400">
+        <p className="flex items-center justify-center gap-2">
+          Made with <span className="text-red-500">❤️</span> by{' '}
+          <a 
+            href="https://www.cyberagi.ai/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            CyberAGI Inc
+          </a>{' '}
+          in <span>🇺🇸</span>
+        </p>
+      </footer>
     </main>
   )
 }
