@@ -3,7 +3,7 @@ import { discoverSubdomains } from '@/lib/crawl-service'
 
 export async function POST(request: Request) {
   try {
-    const { url } = await request.json()
+    const { url, depth = 3 } = await request.json()
 
     if (!url) {
       return NextResponse.json(
@@ -12,8 +12,11 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log('Making discover request for URL:', url)
-    const pages = await discoverSubdomains(url)
+    // Validate depth is between 1 and 5
+    const validatedDepth = Math.min(5, Math.max(1, parseInt(String(depth)) || 3))
+    
+    console.log('Making discover request for URL:', url, 'with depth:', validatedDepth)
+    const pages = await discoverSubdomains({ url, depth: validatedDepth })
     console.log('Received pages from backend:', pages)
 
     // Even if we get an empty array, we should still return it with a 200 status

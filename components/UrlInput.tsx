@@ -1,23 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { Globe, ArrowRight, AlertCircle } from 'lucide-react'
+import { Globe, ArrowRight, AlertCircle, Layers } from 'lucide-react'
 import { Button, Input } from "@/components/ui"
 import { validateUrl } from '@/lib/crawl-service'
 
 interface UrlInputProps {
-  onSubmit: (url: string) => void
+  onSubmit: (url: string, depth: number) => void
 }
 
 export default function UrlInput({ onSubmit }: UrlInputProps) {
   const [inputUrl, setInputUrl] = useState('')
+  const [depth, setDepth] = useState(3)
   const [error, setError] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Form submitted with URL:', inputUrl)
+    console.log('Form submitted with URL:', inputUrl, 'depth:', depth)
     setError('')
 
     if (!inputUrl.trim()) {
@@ -35,7 +36,7 @@ export default function UrlInput({ onSubmit }: UrlInputProps) {
     try {
       setIsSubmitting(true)
       console.log('URL validation passed, calling onSubmit')
-      await onSubmit(inputUrl.trim())
+      await onSubmit(inputUrl.trim(), depth)
     } catch (error) {
       console.error('Error in form submission:', error)
       setError(error instanceof Error ? error.message : 'Failed to process URL')
@@ -80,6 +81,21 @@ export default function UrlInput({ onSubmit }: UrlInputProps) {
             aria-invalid={!!error}
             disabled={isSubmitting}
           />
+
+          {/* Depth Selector */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800">
+            <Layers className="w-4 h-4 text-gray-400" />
+            <Input
+              type="number"
+              min={1}
+              max={5}
+              value={depth}
+              onChange={(e) => setDepth(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
+              className="w-16 bg-transparent border-none text-white text-center focus-visible:ring-0 focus-visible:ring-offset-0"
+              title="Crawl depth (1-5)"
+              disabled={isSubmitting}
+            />
+          </div>
 
           {/* Submit Button */}
           <Button
@@ -127,7 +143,7 @@ export default function UrlInput({ onSubmit }: UrlInputProps) {
           ${!error ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
         `}>
           <p className="text-sm text-gray-400">
-            Enter a complete URL including http:// or https://
+            Enter a complete URL including http:// or https:// and select crawl depth (1-5)
           </p>
         </div>
       </div>

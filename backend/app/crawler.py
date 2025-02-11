@@ -9,10 +9,15 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 # Configure logging
 logger = logging.getLogger(__name__)
 
+class InternalLink(BaseModel):
+    href: str
+    text: str
+
 class DiscoveredPage(BaseModel):
     url: str
     title: Optional[str] = None
     status: str = "pending"
+    internalLinks: Optional[List[InternalLink]] = None
 
 class CrawlStats(BaseModel):
     subdomains_parsed: int = 0
@@ -58,104 +63,136 @@ def get_crawler_config(session_id: str = None) -> CrawlerRunConfig:
     )
     
     return CrawlerRunConfig(
+        # Content extraction settings
         word_count_threshold=5,  # Lower threshold to match content filter
+        markdown_generator=markdown_generator,
+        
+        # Cache and performance
         cache_mode=CacheMode.ENABLED,
         verbose=True,
-        wait_until='networkidle',
+        
+        # Page loading and lazy content
+        wait_until='domcontentloaded',  # Less strict than 'networkidle'
+        wait_for_images=True,  # Wait for images to fully load
+        scan_full_page=True,  # Scroll entire page to trigger lazy loading
+        scroll_delay=0.5,  # Delay between scroll steps
+        page_timeout=120000,  # 2 minutes timeout
+        
+        # Media and output settings
         screenshot=False,
         pdf=False,
-        magic=True,  # Enable magic mode for better bot detection avoidance
-        scan_full_page=True,
-        markdown_generator=markdown_generator  # Use custom markdown generator
+        
+        # Bot detection avoidance
+        magic=True  # Enable magic mode for better bot detection avoidance
     )
 
-async def discover_pages(url: str) -> List[DiscoveredPage]:
+async def discover_pages(url: str, max_depth: int = 3, current_depth: int = 1, seen_urls: set = None) -> List[DiscoveredPage]:
     """
     Discover all related pages under a given URL using Crawl4AI's link analysis.
+    
+    Args:
+        url: The starting URL to crawl
+        max_depth: Maximum depth of crawling (default: 3)
+        current_depth: Current depth in the crawl (default: 1)
+        seen_urls: Set of already seen URLs (default: None)
     """
+    if seen_urls is None:
+        seen_urls = set()
+    
     discovered_pages = []
-    seen_urls = set()  # Keep track of URLs we've seen
-    logger.info(f"Starting discovery for URL: {url}")
+    logger.info(f"Starting discovery for URL: {url} at depth {current_depth}/{max_depth}")
+    
+    if current_depth > max_depth:
+        return discovered_pages
     
     try:
         browser_config = get_browser_config()
         crawler_config = get_crawler_config()
-        seen_urls.add(url)  # Add the primary URL to seen set
-        logger.info("Initializing crawler with browser config: %s", browser_config)
-        logger.info("Using crawler config: %s", crawler_config)
+        seen_urls.add(url)
         
         async with AsyncWebCrawler(config=browser_config) as crawler:
-            result = await crawler.arun(url=url, config=crawler_config)
-            logger.info(f"Crawl completed for {url}. Success: {result.success}")
-            
-            # Extract title from content
-            title = "Untitled Page"
-            if result.markdown_v2 and result.markdown_v2.fit_markdown:
-                content_lines = result.markdown_v2.fit_markdown.split('\n')
-                if content_lines:
-                    potential_title = content_lines[0].strip('# ').strip()
-                    if potential_title:
-                        title = potential_title
-
-            primary_page = DiscoveredPage(
-                url=url,
-                title=title,
-                status="crawled" if result.success else "pending"
-            )
-
-            # Process internal links first
-            if hasattr(result, 'links') and isinstance(result.links, dict):
-                internal_links = result.links.get("internal", [])
-                logger.info(f"Found {len(internal_links)} internal links")
+            try:
+                result = await crawler.arun(url=url, config=crawler_config)
                 
-                for link in internal_links:
-                    try:
-                        href = link.get("href", "")
-                        if not href:
-                            logger.debug(f"Skipping empty URL")
-                            continue
-                        
-                        # Ensure the URL is absolute
-                        if not href.startswith(('http://', 'https://')):
-                            from urllib.parse import urljoin
-                            href = urljoin(url, href)
-                            logger.debug(f"Converted to absolute URL: {href}")
-                        
-                        # Skip restricted paths
-                        if any(excluded in href.lower() for excluded in [
+                # Extract title and add current page
+                title = "Untitled Page"
+                if result.markdown_v2 and result.markdown_v2.fit_markdown:
+                    content_lines = result.markdown_v2.fit_markdown.split('\n')
+                    if content_lines:
+                        potential_title = content_lines[0].strip('# ').strip()
+                        if potential_title:
+                            title = potential_title
+
+                # Process internal links
+                internal_links = []
+                if hasattr(result, 'links') and isinstance(result.links, dict):
+                    internal_links = [
+                        InternalLink(href=link.get("href", ""), text=link.get("text", "").strip())
+                        for link in result.links.get("internal", [])
+                        if link.get("href") and not any(excluded in link.get("href", "").lower() for excluded in [
                             "login", "signup", "register", "logout",
                             "account", "profile", "admin"
-                        ]):
-                            logger.debug(f"Skipping restricted URL: {href}")
-                            continue
+                        ])
+                    ]
+                    logger.info(f"Found {len(internal_links)} internal links at depth {current_depth}")
 
-                        # Ensure the URL is from the same domain
-                        from urllib.parse import urlparse
-                        base_domain = urlparse(url).netloc
-                        link_domain = urlparse(href).netloc
-                        if base_domain != link_domain:
-                            logger.debug(f"Skipping external URL: {href}")
-                            continue
+                primary_page = DiscoveredPage(
+                    url=url,
+                    title=title,
+                    status="crawled" if result.success else "pending",
+                    internalLinks=internal_links
+                )
+                discovered_pages.append(primary_page)
 
-                        link_title = link.get("text", "").strip() or "Untitled Page"
-                        logger.info(f"Adding discovered page: {href} ({link_title})")
-                        discovered_pages.append(
-                            DiscoveredPage(
+                # Recursively discover pages from internal links
+                if current_depth < max_depth:
+                    for link in internal_links:
+                        try:
+                            href = link.href
+                            if href in seen_urls:
+                                continue
+                            
+                            # Ensure the URL is absolute
+                            if not href.startswith(('http://', 'https://')):
+                                from urllib.parse import urljoin
+                                href = urljoin(url, href)
+                            
+                            # Ensure the URL is from the same domain
+                            from urllib.parse import urlparse
+                            base_domain = urlparse(url).netloc
+                            link_domain = urlparse(href).netloc
+                            if base_domain != link_domain:
+                                continue
+
+                            # Recursively discover pages from this URL
+                            sub_pages = await discover_pages(
                                 url=href,
-                                title=link_title,
-                                status="pending"
+                                max_depth=max_depth,
+                                current_depth=current_depth + 1,
+                                seen_urls=seen_urls
                             )
-                        )
-                    except Exception as e:
-                        logger.error(f"Error processing link {link}: {str(e)}")
-                        continue
+                            discovered_pages.extend(sub_pages)
 
-            logger.info(f"Discovered {len(discovered_pages)} valid pages from {url}")
+                        except Exception as e:
+                            logger.error(f"Error processing link {link}: {str(e)}")
+                            continue
+
+            except Exception as e:
+                logger.error(f"Error crawling {url}: {str(e)}")
+                # Don't fail the whole crawl for one page
+                discovered_pages.append(
+                    DiscoveredPage(
+                        url=url,
+                        title="Error Page",
+                        status="error"
+                    )
+                )
+
             return discovered_pages
 
     except Exception as e:
         logger.error(f"Error discovering pages: {str(e)}")
-        return [DiscoveredPage(url=url, title="Main Page", status="pending")]
+        return [DiscoveredPage(url=url, title="Main Page", status="error")]
 
 async def crawl_pages(pages: List[DiscoveredPage]) -> CrawlResult:
     """

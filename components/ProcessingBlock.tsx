@@ -25,7 +25,6 @@ export default function ProcessingBlock({ isProcessing, stats = {
   dataExtracted: '0 KB',
   errorsEncountered: 0
 } }: ProcessingBlockProps) {
-  // Calculate progress percentage for the progress bar
   const progress = Math.min(
     ((stats.subdomainsParsed + stats.pagesCrawled) /
     (stats.subdomainsParsed > 0 ? stats.subdomainsParsed * 2 : 2)) * 100,
@@ -61,7 +60,6 @@ export default function ProcessingBlock({ isProcessing, stats = {
 
   return (
     <div className="w-full">
-      {/* Status Header */}
       <div className={`
         flex items-center gap-3 p-3 mb-4 rounded-lg
         transition-all duration-300
@@ -81,7 +79,6 @@ export default function ProcessingBlock({ isProcessing, stats = {
         </div>
       </div>
 
-      {/* Progress Bar */}
       <div className="h-1 w-full bg-gray-700 rounded-full mb-6 overflow-hidden">
         <div
           className={`
@@ -92,28 +89,27 @@ export default function ProcessingBlock({ isProcessing, stats = {
         />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
-        {statItems.map((item, index) => (
+      <div className="flex gap-4">
+        {statItems.map((item) => (
           <div
             key={item.label}
             className={`
-              p-4 rounded-xl bg-gray-800/50 backdrop-blur-sm
+              flex-1 p-4 rounded-xl bg-gray-800/50 backdrop-blur-sm
               border border-gray-700/50
               transition-all duration-300
               ${isProcessing ? 'transform hover:scale-105' : ''}
             `}
           >
-            <div className="flex items-center gap-3 mb-2">
-              <item.icon className={`w-5 h-5 ${item.color}`} />
-              <span className="text-sm text-gray-400">{item.label}</span>
+            <div className="flex items-center gap-2 mb-2">
+              <item.icon className={`w-4 h-4 ${item.color}`} />
+              <span className="text-xs text-gray-400">{item.label}</span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-bold ${item.color}`}>
+              <span className={`text-xl font-bold ${item.color}`}>
                 {item.value}
               </span>
               {isProcessing && (
-                <ArrowRight className={`w-4 h-4 ${item.color} animate-pulse`} />
+                <ArrowRight className={`w-3 h-3 ${item.color} animate-pulse`} />
               )}
             </div>
           </div>

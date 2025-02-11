@@ -34,6 +34,7 @@ app.add_middleware(
 
 class DiscoverRequest(BaseModel):
     url: str
+    depth: int = 3  # Default depth of 3 if not provided
 
 class CrawlRequest(BaseModel):
     pages: List[DiscoveredPage]
@@ -160,8 +161,8 @@ async def get_mcp_logs():
 async def discover_endpoint(request: DiscoverRequest):
     """Discover pages related to the provided URL"""
     try:
-        logger.info(f"Received discover request for URL: {request.url}")
-        pages = await discover_pages(request.url)
+        logger.info(f"Received discover request for URL: {request.url} with depth: {request.depth}")
+        pages = await discover_pages(request.url, max_depth=request.depth)
         
         # Log the results
         if pages:

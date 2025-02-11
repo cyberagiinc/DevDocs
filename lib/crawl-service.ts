@@ -1,18 +1,18 @@
-import { DiscoveredPage, CrawlResult } from './types'
+import { DiscoveredPage, CrawlResult, DiscoverOptions } from './types'
 
 const BACKEND_URL = 'http://localhost:24125'
 
-export async function discoverSubdomains(primaryUrl: string): Promise<DiscoveredPage[]> {
+export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): Promise<DiscoveredPage[]> {
   try {
     console.log('Making request to backend:', `${BACKEND_URL}/api/discover`)
-    console.log('Request payload:', { url: primaryUrl })
+    console.log('Request payload:', { url, depth })
 
     const response = await fetch(`${BACKEND_URL}/api/discover`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url: primaryUrl }),
+      body: JSON.stringify({ url, depth }),
     })
 
     console.log('Response status:', response.status)
