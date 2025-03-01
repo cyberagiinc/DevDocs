@@ -96,12 +96,11 @@ We made using DevDocs extremely easy, no complex documentation to learn DevDocs.
 
 ```bash
 # Clone the repository
-git clone https://github.com/cyberagi/devdocs.git
+git clone https://github.com/cyberagiinc/DevDocs.git
 
 # Install all good stuff
-cd devdocs
-cd fast-markdown-mcp
-./setup.sh
+cd DevDocs
+./fast-markdown-mcp/setup.sh
 
 # Run Devdocs, (next time just run ./start.sh as all requirements are already installed)
 ./start.sh
