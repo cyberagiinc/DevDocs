@@ -6,9 +6,12 @@ services:
     container_name: devdocs-frontend
     ports:
       - "3001:3001"
+    volumes:
+      - ${STORAGE_PATH:-./storage/markdown}:/app/storage/markdown
     environment:
       - BACKEND_URL=http://backend:24125
       - MCP_HOST=mcp
+      - STORAGE_PATH=/app/storage/markdown
     depends_on:
       - backend
     networks:

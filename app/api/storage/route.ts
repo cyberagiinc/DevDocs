@@ -12,7 +12,17 @@ const getStoragePath = () => {
   }
 
   // Otherwise, treat as relative to process.cwd()
-  return path.join(process.cwd(), configuredPath);
+  const storagePath = path.join(process.cwd(), configuredPath);
+
+  // TEMP-DEBUG: Log the storage path being used
+  console.log("TEMP-DEBUG: Storage path resolved to:", storagePath);
+  console.log("TEMP-DEBUG: Current working directory:", process.cwd());
+  console.log(
+    "TEMP-DEBUG: Environment STORAGE_PATH:",
+    process.env.STORAGE_PATH
+  );
+
+  return storagePath;
 };
 
 const STORAGE_DIR = getStoragePath();
@@ -49,17 +59,47 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    // TEMP-DEBUG: Log the request URL
+    console.log("TEMP-DEBUG: GET request URL:", request.url);
+
     const { searchParams } = new URL(request.url);
     const url = searchParams.get("url");
 
+    console.log("TEMP-DEBUG: URL param:", url);
+    console.log("TEMP-DEBUG: STORAGE_DIR:", STORAGE_DIR);
+
     // Handle list request
     if (!url) {
-      // Only get .md files
-      const files = await fs.readdir(STORAGE_DIR);
-      const mdFiles = files.filter((f) => f.endsWith(".md"));
-      const jsonFiles = files.filter((f) => f.endsWith(".json"));
+      // TEMP-DEBUG: Listing files
+      console.log("TEMP-DEBUG: Listing files from directory:", STORAGE_DIR);
+
+      try {
+        // Only get .md files
+        const files = await fs.readdir(STORAGE_DIR);
+        console.log("TEMP-DEBUG: Directory contents:", files);
+
+        const mdFiles = files.filter((f) => f.endsWith(".md"));
+        const jsonFiles = files.filter((f) => f.endsWith(".json"));
+
+        console.log("TEMP-DEBUG: Found MD files:", mdFiles.length);
+        console.log("TEMP-DEBUG: Found JSON files:", jsonFiles.length);
+      } catch (dirError) {
+        console.error("TEMP-DEBUG: Error reading directory:", dirError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Failed to read storage directory: ${dirError.message}`,
+            debug: {
+              storageDir: STORAGE_DIR,
+              exists: false,
+            },
+          },
+          { status: 500 }
+        );
+      }
 
       // Get disk files
+      console.log("TEMP-DEBUG: Starting to process disk files");
       const diskFileDetails = await Promise.all(
         mdFiles.map(async (filename) => {
           const mdPath = path.join(STORAGE_DIR, filename);
@@ -67,8 +107,16 @@ export async function GET(request: Request) {
             STORAGE_DIR,
             filename.replace(".md", ".json")
           );
+
+          console.log(`TEMP-DEBUG: Processing file: ${filename}`);
+          console.log(`TEMP-DEBUG: MD Path: ${mdPath}`);
+          console.log(`TEMP-DEBUG: JSON Path: ${jsonPath}`);
+
           const stats = await fs.stat(mdPath);
           const content = await fs.readFile(mdPath, "utf-8");
+          console.log(
+            `TEMP-DEBUG: File size: ${stats.size}, Modified: ${stats.mtime}`
+          );
 
           // Check if this is a consolidated file by examining the JSON metadata
           let isConsolidated = false;
@@ -233,31 +281,82 @@ export async function GET(request: Request) {
 
       // Combine disk and memory files
       const allFiles = [...diskFileDetails, ...memoryFiles];
+      console.log("TEMP-DEBUG: All files combined count:", allFiles.length);
+
+      // Log details of each file
+      console.log("TEMP-DEBUG: File details:");
+      allFiles.forEach((file, index) => {
+        console.log(`TEMP-DEBUG: File ${index + 1}:`, {
+          name: file.name,
+          isConsolidated: file.isConsolidated,
+          pagesCount: file.pagesCount,
+          isInMemory: file.isInMemory,
+          size: file.size,
+        });
+      });
 
       // Filter out individual files (non-consolidated files)
       // Only show consolidated files in the Stored Files section
       const consolidatedFiles = allFiles.filter((file) => file.isConsolidated);
+      console.log(
+        "TEMP-DEBUG: Consolidated files count:",
+        consolidatedFiles.length
+      );
 
       // Additional filter to exclude files with UUID-like names
       // UUID pattern: 8-4-4-4-12 hex digits (e.g., 095104d8-8e90-48f0-8670-9e45c914f115)
       const uuidPattern =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+      // Log consolidated files before UUID filtering
+      console.log("TEMP-DEBUG: Consolidated files before UUID filtering:");
+      consolidatedFiles.forEach((file, index) => {
+        console.log(`TEMP-DEBUG: Consolidated file ${index + 1}:`, {
+          name: file.name,
+          isUUID: uuidPattern.test(file.name),
+          pagesCount: file.pagesCount,
+        });
+      });
+
       // Keep only files with domain-like names (e.g., docs_crawl4ai_com)
       // These are files created through the crawling process
       const crawledFiles = consolidatedFiles.filter((file) => {
         // Check if the filename is NOT a UUID
-        return !uuidPattern.test(file.name);
+        const isNotUUID = !uuidPattern.test(file.name);
+        console.log(
+          `TEMP-DEBUG: File ${file.name} is ${isNotUUID ? "NOT" : "IS"} a UUID`
+        );
+        return isNotUUID;
       });
 
       console.log(
-        `Found ${consolidatedFiles.length} consolidated files, ${crawledFiles.length} are crawled files`
+        `TEMP-DEBUG: Found ${consolidatedFiles.length} consolidated files, ${crawledFiles.length} are crawled files`
       );
 
-      return NextResponse.json({
+      // Log the final files being returned to the frontend
+      console.log("TEMP-DEBUG: Final files being returned to frontend:");
+      crawledFiles.forEach((file, index) => {
+        console.log(`TEMP-DEBUG: Returned file ${index + 1}:`, {
+          name: file.name,
+          isConsolidated: file.isConsolidated,
+          pagesCount: file.pagesCount,
+          size: file.size,
+          rootUrl: file.rootUrl || "none",
+        });
+      });
+
+      // Return the files
+      const response = {
         success: true,
         files: crawledFiles,
-      });
+      };
+
+      console.log(
+        "TEMP-DEBUG: Final response:",
+        JSON.stringify(response, null, 2).substring(0, 1000) + "..."
+      );
+
+      return NextResponse.json(response);
     }
 
     // Handle single file request
