@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+from .document_structure import DocumentStructure
 import sys
+import os
 import logging
 import signal
 import json
@@ -15,17 +17,16 @@ from watchdog.events import FileSystemEventHandler
 
 logger = logging.getLogger(__name__)
 
-from .document_structure import DocumentStructure
 
 class MarkdownStore:
     """Manages markdown content and metadata."""
-    
+
     def __init__(self, storage_path: str):
         self.base_path = Path(storage_path)
         self.content_cache = {}
         self.metadata_cache = {}
         self.structure_cache = {}  # Cache for parsed document structures
-        
+
     async def sync_all_files(self):
         """Initial sync of all files in the storage directory."""
         logger.info("Starting initial sync of all files...")
@@ -37,7 +38,7 @@ class MarkdownStore:
         except Exception as e:
             logger.error(f"Error during initial sync: {e}")
             raise
-        
+
     async def get_content(self, file_id: str) -> str:
         """Get markdown content."""
         file_path = self.base_path / f"{file_id}.md"
@@ -57,38 +58,41 @@ class MarkdownStore:
         """Get a specific section from a markdown file."""
         try:
             if file_id not in self.structure_cache:
-                await self.get_content(file_id)  # This will parse and cache the structure
-            
+                # This will parse and cache the structure
+                await self.get_content(file_id)
+
             structure = self.structure_cache[file_id]
             section = structure.get_section_by_id(section_id)
-            
+
             if not section:
                 return f"Section '{section_id}' not found in {file_id}"
-                
+
             return f"Section: {section.title}\n\n{section.content}"
         except Exception as e:
-            logger.error(f"Error getting section {section_id} from {file_id}: {e}")
+            logger.error(
+                f"Error getting section {section_id} from {file_id}: {e}")
             return f"Error getting section: {str(e)}"
 
     async def get_table_of_contents(self, file_id: str) -> str:
         """Get table of contents for a markdown file."""
         try:
             if file_id not in self.structure_cache:
-                await self.get_content(file_id)  # This will parse and cache the structure
-            
+                # This will parse and cache the structure
+                await self.get_content(file_id)
+
             structure = self.structure_cache[file_id]
             toc = structure.get_table_of_contents()
-            
+
             result = [f"Table of Contents for {file_id}:"]
             for level, title, section_id in toc:
                 indent = "  " * level
                 result.append(f"{indent}- {title} [{section_id}]")
-            
+
             return "\n".join(result)
         except Exception as e:
             logger.error(f"Error getting table of contents for {file_id}: {e}")
             return f"Error getting table of contents: {str(e)}"
-        
+
     async def get_metadata(self, file_id: str) -> dict:
         """Get metadata as a dictionary."""
         file_path = self.base_path / f"{file_id}.json"
@@ -124,13 +128,15 @@ class MarkdownStore:
                     logger.info(f"Created default metadata for {file_id}")
                     return default_metadata
                 except Exception as write_error:
-                    logger.error(f"Error creating default metadata for {file_id}: {write_error}")
-            logger.error(f"Error reading metadata for {file_id}: File not found")
+                    logger.error(
+                        f"Error creating default metadata for {file_id}: {write_error}")
+            logger.error(
+                f"Error reading metadata for {file_id}: File not found")
             return {}
         except Exception as e:
             logger.error(f"Error reading metadata for {file_id}: {e}")
             return {}
-        
+
     async def get_index(self) -> str:
         """Get list of available files."""
         try:
@@ -141,7 +147,7 @@ class MarkdownStore:
         except Exception as e:
             logger.error(f"Error getting index: {e}")
             return f"Error getting index: {str(e)}"
-        
+
     async def sync_file(self, file_id: str) -> str:
         """Force sync a file."""
         try:
@@ -149,7 +155,7 @@ class MarkdownStore:
             self.content_cache.pop(file_id, None)
             self.metadata_cache.pop(file_id, None)
             self.structure_cache.pop(file_id, None)
-            
+
             # Reload content and metadata
             content = await self.get_content(file_id)
             metadata = await self.get_metadata(file_id)
@@ -200,7 +206,7 @@ Metadata:
                 file_id = md_file.stem
                 content = await self.get_content(file_id)
                 metadata = await self.get_metadata(file_id)
-                
+
                 if query.lower() in content.lower():
                     # Find the context around the match
                     lines = content.split('\n')
@@ -208,13 +214,14 @@ Metadata:
                         if query.lower() in line.lower():
                             context_start = max(0, i - 2)
                             context_end = min(len(lines), i + 3)
-                            context = '\n'.join(lines[context_start:context_end])
-                            
+                            context = '\n'.join(
+                                lines[context_start:context_end])
+
                             results.append(f"""Match in {file_id}.md:
 Context:
 {context}
 ---""")
-            
+
             if not results:
                 return f"No matches found for query: {query}"
             return "\n\n".join(results)
@@ -229,16 +236,17 @@ Context:
             for json_file in self.base_path.glob("*.json"):
                 file_id = json_file.stem
                 metadata = await self.get_metadata(file_id)
-                
+
                 # Check both metadata.tags and top-level tags
-                tags = metadata.get('metadata', {}).get('tags', []) + metadata.get('tags', [])
-                
+                tags = metadata.get('metadata', {}).get(
+                    'tags', []) + metadata.get('tags', [])
+
                 if tag.lower() in [t.lower() for t in tags]:
                     results.append(f"""File: {file_id}.md
 Tags: {', '.join(tags)}
 Last modified: {metadata.get('timestamp', 'Unknown')}
 ---""")
-            
+
             if not results:
                 return f"No files found with tag: {tag}"
             return "\n\n".join(results)
@@ -254,25 +262,26 @@ Last modified: {metadata.get('timestamp', 'Unknown')}
             total_chars = 0
             files_by_month = {}
             all_tags = set()
-            
+
             for json_file in self.base_path.glob("*.json"):
                 file_id = json_file.stem
                 metadata = await self.get_metadata(file_id)
-                
+
                 total_files += 1
                 total_words += metadata.get('stats', {}).get('wordCount', 0)
                 total_chars += metadata.get('stats', {}).get('charCount', 0)
-                
+
                 # Extract month from timestamp
                 timestamp = metadata.get('timestamp', '')
                 if timestamp:
                     month = timestamp[:7]  # YYYY-MM
                     files_by_month[month] = files_by_month.get(month, 0) + 1
-                
+
                 # Collect all tags
-                tags = metadata.get('metadata', {}).get('tags', []) + metadata.get('tags', [])
+                tags = metadata.get('metadata', {}).get(
+                    'tags', []) + metadata.get('tags', [])
                 all_tags.update(tags)
-            
+
             stats = f"""Markdown Files Statistics:
 
 Total Files: {total_files}
@@ -290,13 +299,14 @@ All Tags:
             logger.error(f"Error getting stats: {e}")
             return f"Error getting statistics: {str(e)}"
 
+
 class MarkdownEventHandler(FileSystemEventHandler):
     """Handles file system events for markdown files."""
-    
+
     def __init__(self, store: MarkdownStore, loop: asyncio.AbstractEventLoop):
         self.store = store
         self.loop = loop
-        
+
     def sync_file(self, path: str):
         """Sync a file when it's created or modified."""
         if path.endswith(('.md', '.json')):
@@ -305,29 +315,32 @@ class MarkdownEventHandler(FileSystemEventHandler):
                 self.store.sync_file(file_id),
                 self.loop
             )
-            
+
     def on_created(self, event):
         """Handle file creation."""
         if not event.is_directory:
             self.sync_file(event.src_path)
-            
+
     def on_modified(self, event):
         """Handle file modification."""
         if not event.is_directory:
             self.sync_file(event.src_path)
 
+
 class FastMarkdownServer:
     """MCP server for markdown content management."""
-    
+
     def __init__(self, storage_path: str):
-        self.server = Server("fast-markdown", version="1.0.0")  # Set default version
+        # Set default version
+        self.server = Server("fast-markdown", version="1.0.0")
         self.store = MarkdownStore(storage_path)
         self.loop = asyncio.get_event_loop()
         self.event_handler = MarkdownEventHandler(self.store, self.loop)
         self.observer = Observer()
-        self.observer.schedule(self.event_handler, storage_path, recursive=False)
+        self.observer.schedule(
+            self.event_handler, storage_path, recursive=False)
         self.setup_handlers()
-        
+
     def setup_handlers(self):
         """Set up request handlers."""
         @self.server.list_resources()
@@ -350,14 +363,14 @@ class FastMarkdownServer:
             """Read resource content."""
             if not uri.startswith("markdown://"):
                 raise ValueError(f"Invalid resource URI: {uri}")
-            
+
             parts = uri.split("/")
             if len(parts) != 4 or parts[3] not in ["content", "metadata"]:
                 raise ValueError(f"Invalid resource URI format: {uri}")
-            
+
             file_id = parts[2]
             resource_type = parts[3]
-            
+
             if resource_type == "content":
                 return await self.store.get_content(file_id)
             else:
@@ -537,10 +550,10 @@ class FastMarkdownServer:
         logger.info("Starting server...")
         # Start the file observer
         self.observer.start()
-        
+
         # Initial sync of all files
         await self.store.sync_all_files()
-        
+
         try:
             # Keep the server running
             while True:
@@ -560,51 +573,65 @@ class FastMarkdownServer:
             self.observer.join()
             logger.info("Server shutdown complete")
 
+
 def setup_logging():
     """Configure logging."""
     # Get the project root directory
     root_dir = Path(__file__).parents[3].resolve()
     log_dir = root_dir / "logs"
     log_dir.mkdir(exist_ok=True)
-    
+
     # Use absolute path for log file
     log_path = log_dir / "mcp.log"
-    
+
     # Configure file handler for all logs
     file_handler = logging.FileHandler(str(log_path))
     file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
     # Configure console handler with higher log level to reduce noise
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)  # Only show WARNING and above in console
-    console_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-    
+    # Only show WARNING and above in console
+    console_handler.setLevel(logging.WARNING)
+    console_handler.setFormatter(
+        logging.Formatter('%(levelname)s: %(message)s'))
+
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
-    
+
     # Specifically set higher log level for MCP SDK's internal logging
     mcp_logger = logging.getLogger('mcp.server.lowlevel')
     mcp_logger.setLevel(logging.WARNING)
+
 
 def handle_sigterm(signum, frame):
     """Handle SIGTERM signal."""
     logger.info("Received shutdown signal")
     sys.exit(0)
 
+
 async def main() -> None:
     """Main entry point."""
-    if len(sys.argv) != 2:
-        print("Usage: fast-markdown-mcp <storage_path>")
-        sys.exit(1)
-    
     setup_logging()
     signal.signal(signal.SIGTERM, handle_sigterm)
-    storage_path = sys.argv[1]
-    
+
+    # Get storage path from command line arguments or environment variable
+    if len(sys.argv) >= 2:
+        storage_path = sys.argv[1]
+        logger.info(f"Using storage path from command line: {storage_path}")
+    else:
+        # Try to get from environment variable with default fallback
+        storage_path = os.environ.get('STORAGE_PATH', '/app/storage/markdown')
+        logger.info(
+            f"Using storage path from environment variable: {storage_path}")
+
+    # Create the directory if it doesn't exist
+    Path(storage_path).mkdir(parents=True, exist_ok=True)
+
     try:
         server = FastMarkdownServer(storage_path)
         logger.info(f"Starting server with storage path: {storage_path}")

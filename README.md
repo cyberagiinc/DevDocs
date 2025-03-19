@@ -22,38 +22,46 @@
 ## 🎯 Perfect For
 
 ### 🏢 Enterprise Software Developers
+
 Skip weeks of reading documentation and dealing with technical debt. Implement ANY technology faster by letting DevDocs handle the heavy lifting of documentation understanding.
 
 ### 🕸️ Web Scrapers
+
 Pull entire contents of websites with Smart Discovery of Child URLs up to level 5. Perfect for both internal and external website documentation with intelligent crawling.
 
 ### 👥 Development Teams
+
 Leverage internal documentation with built-in MCP servers and Claude integration for intelligent data querying. Transform your team's knowledge base into an actionable resource.
 
 ### 🚀 Indie Hackers
+
 DevDocs + VSCode(cline) + Your Idea = Ship products fast with ANY technology. No more getting stuck in documentation hell when building your next big thing.
 
 ## ✨ Features
 
 ### 🧠 Intelligent Crawling
+
 - **Smart Depth Control**: Choose crawl depth from 1-5 levels
 - **Automatic Link Discovery**: Finds and categorizes all related content
 - **Selective Crawling**: Pick exactly what you want to extract
 - **Child URL Detection**: Automatically discovers and maps website structure
 
 ### ⚡ Performance & Speed
+
 - **Parallel Processing**: Crawl multiple pages simultaneously
 - **Smart Caching**: Never waste time on duplicate content
 - **Lazy Loading Support**: Handles modern web apps effortlessly
 - **Rate Limiting**: Respectful crawling that won't overload servers
 
 ### 🎯 Content Processing
+
 - **Clean Extraction**: Get content without the fluff
 - **Multiple Formats**: Export to MD or JSON for LLM fine-tuning
 - **Structured Output**: Logically organized content
 - **MCP Server Integration**: Ready for AI processing
 
 ### 🛡️ Enterprise Features
+
 - **Error Recovery**: Auto-retry on failures
 - **Full Logging**: Track every operation
 - **API Access**: Integrate with your tools
@@ -62,32 +70,35 @@ DevDocs + VSCode(cline) + Your Idea = Ship products fast with ANY technology. No
 ## 🤔 Why DevDocs?
 
 ### The Problem
+
 Documentation is everywhere and LLMs are OUTDATED in their knowledge. Reading it, understanding it, and implementing it takes weeks of research and development even for senior engineers. **We cut down that time to hours.**
 
 ### Our Solution
+
 DevDocs brings documentation to you. Point it at any tech documentation URL, and watch as it:
+
 1. Discovers all related pages to that technology
 2. Extracts meaningful content without the fluff
 3. Organizes information logically inside an MCP server ready for your LLM to query
 4. Presents it in a clean, searchable format in MD or JSON for finetuning LLM purpose
 
-🔥 We want anyone in the world to have the ability to build amazing products quickly using the most cutting edge LLM technology. 
+🔥 We want anyone in the world to have the ability to build amazing products quickly using the most cutting edge LLM technology.
 
 ## 💰 Pricing Comparison
 
-| Feature | DevDocs | Firecrawl |
-|---------|---------|-----------|
-| Free Tier | Unlimited pages | None |
-| Starting Price | Free Forever | $16/month |
-| Enterprise Plan | Custom | $333/month |
-| Crawl Speed | 1000/min | 20/min |
-| Depth Levels | Up to 5 | Limited |
-| Team Seats | Unlimited | 1-5 seats |
-| Export Formats | MD, JSON, LLM-ready MCP servers | Limited formats |
-| API Access | Coming Soon | Limited |
-| Model Context Protocol Integration | ✅ | ❌ |
-| Support | Priority Available via Discord | Standard only |
-| Self-hosted (free use) | ✅ | ❌ |
+| Feature                            | DevDocs                         | Firecrawl       |
+| ---------------------------------- | ------------------------------- | --------------- |
+| Free Tier                          | Unlimited pages                 | None            |
+| Starting Price                     | Free Forever                    | $16/month       |
+| Enterprise Plan                    | Custom                          | $333/month      |
+| Crawl Speed                        | 1000/min                        | 20/min          |
+| Depth Levels                       | Up to 5                         | Limited         |
+| Team Seats                         | Unlimited                       | 1-5 seats       |
+| Export Formats                     | MD, JSON, LLM-ready MCP servers | Limited formats |
+| API Access                         | Coming Soon                     | Limited         |
+| Model Context Protocol Integration | ✅                              | ❌              |
+| Support                            | Priority Available via Discord  | Standard only   |
+| Self-hosted (free use)             | ✅                              | ❌              |
 
 ## 🚀 Getting Started
 
@@ -101,6 +112,7 @@ DevDocs is designed to be easy to use with Docker, requiring minimal setup for n
 ### Quick Start with Docker (Recommended)
 
 For Mac/Linux users:
+
 ```bash
 # Clone the repository
 git clone https://github.com/cyberagiinc/DevDocs.git
@@ -113,6 +125,7 @@ cd DevDocs
 ```
 
 For Windows users:
+
 ```cmd
 # Clone the repository
 git clone https://github.com/cyberagiinc/DevDocs.git
@@ -123,6 +136,7 @@ cd DevDocs
 # Start all services using Docker
 docker-start.bat
 ```
+
 <details>
 <summary>Note for Windows Users</summary>
 
@@ -133,6 +147,7 @@ docker-start.bat
 > If you need to manually set permissions, you can do so using either the Windows GUI or command line:
 >
 > **Using Windows Explorer**:
+>
 > 1. Right-click on each directory (logs, storage, crawl_results)
 > 2. Select "Properties"
 > 3. Go to the "Security" tab
@@ -145,30 +160,84 @@ docker-start.bat
 > 10. Click "Apply" and "OK"
 >
 > **Using Command Prompt (as Administrator)**:
+>
 > ```cmd
 > icacls logs /grant Everyone:F /T
 > icacls storage /grant Everyone:F /T
 > icacls crawl_results /grant Everyone:F /T
 > ```
-</details> 
+
+</details>
 
 <details>
 <summary>Note about docker-compose.yml on Windows</summary>
 
 > If you encounter issues with the docker-compose.yml file (such as "Top-level object must be a mapping" error), the `docker-start.bat` script automatically fixes this by ensuring the file has the correct format and encoding. This fix is applied every time you run the script, so you don't need to manually modify the file.
+
 </details>
 
-
-
 This single command will:
+
 1. Create all necessary directories
 2. Set appropriate permissions
 3. Build and start all Docker containers
 4. Monitor the services to ensure they're running properly
 
+### Storage Configuration
+
+DevDocs now supports configurable storage paths, allowing you to separate your curated data from the source code.
+
+#### Configuration Options
+
+You can configure the storage location by setting the `STORAGE_PATH` environment variable in your `.env` file:
+
+```
+# For a path inside the project (default)
+STORAGE_PATH=storage/markdown
+
+# For an absolute path outside the project
+STORAGE_PATH=/path/to/your/storage
+```
+
+The storage path can be:
+
+- A relative path (relative to the project root directory)
+- An absolute path to store data outside the project directory
+
+#### Usage with Docker
+
+When using Docker, the configured path will be mounted as a volume into the containers. Make sure the path:
+
+- Is accessible by Docker (if using Docker Desktop, enable the necessary file sharing)
+- Has appropriate permissions (the containers run as root by default)
+
+#### Gitignore Considerations
+
+If you're using a custom storage path outside the project directory, you don't need to worry about Git tracking your data files. If your storage path is inside the project, consider adding it to your `.gitignore` file to prevent accidentally committing your data.
+
+#### Troubleshooting Docker File Sharing on macOS
+
+If you encounter an error like this:
+
+```
+Error response from daemon: Mounts denied:
+The path /users/[username]/MCP/devdocs/storage/markdown is not shared from the host and is not known to Docker.
+You can configure shared paths from Docker -> Preferences... -> Resources -> File Sharing.
+```
+
+This means Docker Desktop doesn't have permission to access the directory you're trying to mount. To fix this:
+
+1. Open Docker Desktop
+2. Go to Settings (⚙️) > Resources > File Sharing
+3. Add the parent directory of your storage path to the list of shared folders
+4. Click "Apply & Restart"
+
+This is particularly important when using custom storage paths outside the default project structure.
+
 ### Accessing DevDocs
 
 Once the services are running:
+
 - Frontend UI: http://localhost:3001
 - Backend API: http://localhost:24125
 - Crawl4AI Service: http://localhost:11235
@@ -178,13 +247,14 @@ Once the services are running:
 When using Docker, logs can be accessed :
 
 1. **Container Logs** (recommended for debugging):
+
    ```bash
    # View logs from a specific container
    docker logs devdocs-frontend
    docker logs devdocs-backend
    docker logs devdocs-mcp
    docker logs devdocs-crawl4ai
-   
+
    # Follow logs in real-time
    docker logs -f devdocs-backend
    ```
@@ -196,26 +266,31 @@ To stop all services, press `Ctrl+C` in the terminal where docker-start is runni
 DevDocs includes various utility scripts to help with development, testing, and maintenance. Here's a quick reference:
 
 ### Startup Scripts
+
 - `start.sh` / `start.bat` / `start.ps1` - Start all services (frontend, backend, MCP) for local development.
 - `docker-start.sh` / `docker-start.bat` - Start all services using Docker containers.
 
 ### MCP Server Scripts
+
 - `check_mcp_health.sh` - Verify the MCP server's health and configuration status.
 - `restart_and_test_mcp.sh` - Restart Docker containers with updated MCP configuration and test connectivity.
 
 ### Crawl4AI Scripts
+
 - `check_crawl4ai.sh` - Check the status and health of the Crawl4AI service.
 - `debug_crawl4ai.sh` - Run Crawl4AI in debug mode with verbose logging for troubleshooting.
 - `test_crawl4ai.py` - Run tests against the Crawl4AI service to verify functionality.
 - `test_from_container.sh` - Test the Crawl4AI service from within a Docker container.
 
 ### Utility Scripts
+
 - `view_result.sh` - Display crawl results in a formatted view.
 - `find_empty_folders.sh` - Identify empty directories in the project structure.
 - `analyze_empty_folders.sh` - Analyze empty folders and categorize them by risk level.
 - `verify_reorganization.sh` - Verify that code reorganization was successful.
 
 These scripts are organized in the following directories:
+
 - Root directory: Main scripts for common operations
 - `scripts/general/`: General utility scripts
 - `scripts/docker/`: Docker-specific scripts
@@ -225,27 +300,31 @@ These scripts are organized in the following directories:
 ## 🌍 Built for Developers, by Developers
 
 DevDocs is more than a tool—it's your documentation companion that:
+
 - **Saves Time**: Turn weeks of research into hours
 - **Improves Understanding**: Get clean, organized documentation
 - **Enables Innovation**: Build faster with any technology
 - **Supports Teams**: Share knowledge efficiently
-- **LLM READY**: Modern times require modern solutions, using devdocs with LLM is extremely easy and intuitive. With minimal configuration you can run Devdocs and Claude App and  recognizes DevDocs's MCP server ready to chat with your data. 
+- **LLM READY**: Modern times require modern solutions, using devdocs with LLM is extremely easy and intuitive. With minimal configuration you can run Devdocs and Claude App and recognizes DevDocs's MCP server ready to chat with your data.
 
 ## 🛠️ Setting Up the Cline/Roo Cline for Rapid software development.
 
-1. **Open the "Modes" Interface**  
+1. **Open the "Modes" Interface**
    - In **Roo Code**, click the **+** to create a new Mode-Specific Prompts.
-2. **Name**  
-   - Give the mode a **Name** (e.g., `Research_MCP`).  
+2. **Name**
+   - Give the mode a **Name** (e.g., `Research_MCP`).
 3. **Role Definition Prompt**
+
 ```
 Expertise and Personality: Expertise: Developer documentation retrieval, technical synthesis, and documentation search. Personality: Systematic, detail-oriented, and precise. Provide well-structured answers with clear references to documentation sections.
 
 Behavioral Mandate: Always use the Table Of Contents and Section Access tools when addressing any query regarding the MCP documentation. Maintain clarity, accuracy, and traceability in your responses.
 ```
+
 4. **Mode-Specific Custom Instructions Prompt**
+
 ```
-1. Table Of Contents Tool: Returns a full or filtered list of documentation topics. 
+1. Table Of Contents Tool: Returns a full or filtered list of documentation topics.
 2. Section Access Tool: Retrieves the detailed content of specific documentation sections.
 
 General Process: Query Interpretation: Parse the user's query to extract key topics, keywords, and context. Identify the likely relevant sections (e.g., API configurations, error handling) from the query.
@@ -258,10 +337,10 @@ Synthesis and Response Formation: Combine the retrieved content into a coherent 
 
 Error Handling: If no matching sections are found, adjust the search parameters and retry. Clearly report if the query remains ambiguous or if no relevant documentation is available.
 
-Mandatory Tool Usage: 
+Mandatory Tool Usage:
 Enforcement: Every time a query is received that requires information from the MCP server docs, the agent MUST first query the Table Of Contents tool to list potential relevant topics, then use the Section Access tool to retrieve the necessary detailed content.
 
-Search & Retrieve Workflow: 
+Search & Retrieve Workflow:
 Interpret and Isolate: Identify the key terms and data points from the user's query.
 
 Index Lookup: Immediately query the Table Of Contents tool to obtain a list of relevant documentation sections.
@@ -276,6 +355,7 @@ Custom Instruction Loading: Additional custom instructions specific to Research_
 
 Final Output Construction: The final answer should be organized, directly address the query, and include clear pointers (e.g., section names or identifiers) back to the MCP documentation. Ensure minimal redundancy while covering all necessary details.
 ```
+
 ## 🤝 Join Our Community
 
 - 🌟 [Star us on GitHub](https://github.com/cyberagi/devdocs)
@@ -284,10 +364,9 @@ Final Output Construction: The final answer should be organized, directly addres
 
 ## 🏆 Success Stories
 
-"DevDocs turned our 3-week implementation timeline into 2 days. It's not just a crawler, it's a development accelerator." - *Senior Engineer at Fortune 100 Company*
+"DevDocs turned our 3-week implementation timeline into 2 days. It's not just a crawler, it's a development accelerator." - _Senior Engineer at Fortune 100 Company_
 
-"Launched my SaaS in half the time by using DevDocs to understand and implement new technologies quickly." - *Successful Indie Hacker*
-
+"Launched my SaaS in half the time by using DevDocs to understand and implement new technologies quickly." - _Successful Indie Hacker_
 
 ## 📝 Technology Partners
 
