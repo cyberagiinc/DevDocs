@@ -10,11 +10,28 @@ NC='\033[0m' # No Color
 ROOT_DIR="$(pwd)"
 echo -e "${BLUE}Project root directory: ${ROOT_DIR}${NC}"
 
+# Get storage path from .env file if it exists, otherwise use default
+STORAGE_PATH="storage/markdown"
+if [ -f ".env" ]; then
+  STORAGE_PATH_FROM_ENV=$(grep -e "^STORAGE_PATH=" .env | cut -d '=' -f 2)
+  if [ ! -z "$STORAGE_PATH_FROM_ENV" ]; then
+    STORAGE_PATH="$STORAGE_PATH_FROM_ENV"
+  fi
+fi
+
+# If not absolute, make it relative to current directory
+if [[ "$STORAGE_PATH" != /* ]]; then
+  STORAGE_PATH="$ROOT_DIR/$STORAGE_PATH"
+fi
+
+echo -e "${BLUE}Using storage path: $STORAGE_PATH${NC}"
+export STORAGE_PATH
+
 # Create necessary directories with proper permissions
 mkdir -p logs
-mkdir -p storage/markdown
+mkdir -p "$STORAGE_PATH"
 mkdir -p crawl_results
-chmod -R 777 logs storage crawl_results
+chmod -R 777 logs "$STORAGE_PATH" crawl_results
 
 # Start Docker containers
 echo -e "${BLUE}Starting Docker containers...${NC}"

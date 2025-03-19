@@ -6,9 +6,12 @@ services:
     container_name: devdocs-frontend
     ports:
       - "3001:3001"
+    volumes:
+      - ${STORAGE_PATH:-./storage/markdown}:/app/storage/markdown
     environment:
       - BACKEND_URL=http://backend:24125
       - MCP_HOST=mcp
+      - STORAGE_PATH=/app/storage/markdown
     depends_on:
       - backend
     networks:
@@ -23,13 +26,14 @@ services:
     ports:
       - "24125:24125"
     volumes:
-      - ./storage:/app/storage
+      - ${STORAGE_PATH:-./storage/markdown}:/app/storage/markdown
       - ./logs:/app/logs
       - ./crawl_results:/app/crawl_results
     environment:
       - MCP_HOST=mcp
       - CRAWL4AI_URL=http://crawl4ai:11235
       - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-devdocs-demo-key}
+      - STORAGE_PATH=/app/storage/markdown
     depends_on:
       - crawl4ai
       - mcp
@@ -43,12 +47,14 @@ services:
       dockerfile: docker/dockerfiles/Dockerfile.mcp
     container_name: devdocs-mcp
     volumes:
-      - ./storage/markdown:/app/storage/markdown
+      - ${STORAGE_PATH:-./storage/markdown}:/app/storage/markdown
       - ./logs:/app/logs
+    environment:
+      - STORAGE_PATH=/app/storage/markdown
     networks:
       - devdocs-network
-    stdin_open: true  # Keep stdin open
-    tty: true  # Allocate a pseudo-TTY
+    stdin_open: true # Keep stdin open
+    tty: true # Allocate a pseudo-TTY
     restart: unless-stopped
 
   crawl4ai:

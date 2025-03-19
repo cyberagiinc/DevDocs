@@ -81,9 +81,29 @@ cd "$ROOT_DIR"
 # Activate MCP server's virtual environment and start it
 echo -e "${BLUE}Starting MCP server...${NC}"
 source fast-markdown-mcp/venv/bin/activate
+
+# Get storage path from .env file if it exists, otherwise use default
+STORAGE_PATH="$ROOT_DIR/storage/markdown"
+if [ -f ".env" ]; then
+  # Extract STORAGE_PATH from .env file
+  ENV_STORAGE_PATH=$(grep -e "^STORAGE_PATH=" .env | cut -d '=' -f 2)
+  if [ ! -z "$ENV_STORAGE_PATH" ]; then
+    # If path is relative (doesn't start with /), prepend ROOT_DIR
+    if [[ "$ENV_STORAGE_PATH" != /* ]]; then
+      STORAGE_PATH="$ROOT_DIR/$ENV_STORAGE_PATH"
+    else
+      STORAGE_PATH="$ENV_STORAGE_PATH"
+    fi
+  fi
+fi
+
+# Create storage directory if it doesn't exist
+mkdir -p "$STORAGE_PATH"
+echo -e "${BLUE}Using storage path: $STORAGE_PATH${NC}"
+
 PYTHONPATH="$ROOT_DIR/fast-markdown-mcp/src" \
     fast-markdown-mcp/venv/bin/python -m fast_markdown_mcp.server \
-    "$ROOT_DIR/storage/markdown" > logs/mcp.log 2>&1 &
+    "$STORAGE_PATH" > logs/mcp.log 2>&1 &
 MCP_PID=$!
 
 # Wait for services to be ready
