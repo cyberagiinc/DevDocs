@@ -16,11 +16,20 @@ mkdir -p storage/markdown
 mkdir -p crawl_results
 chmod -R 777 logs storage crawl_results
 
+# Detect which docker compose command to use
+if command -v docker compose &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    echo -e "${RED}Neither docker compose nor docker-compose found${NC}"
+    exit 1
+fi
+
 # Start Docker containers
 echo -e "${BLUE}Starting Docker containers...${NC}"
 echo -e "${BLUE}Building Docker images to include latest code changes...${NC}"
-docker-compose up -d --build
-
+$DOCKER_COMPOSE up -d --build
 echo -e "${GREEN}All services are running!${NC}"
 echo -e "${BLUE}Frontend:${NC} http://localhost:3001"
 echo -e "${BLUE}Backend:${NC} http://localhost:24125"
@@ -41,6 +50,16 @@ trap cleanup SIGINT SIGTERM
 # Keep the script running
 echo -e "${BLUE}Monitoring services...${NC}"
 while true; do
+    # Detect which docker compose command to use
+    if command -v docker compose &> /dev/null; then
+        DOCKER_COMPOSE="docker compose"
+    elif command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE="docker-compose"
+    else
+        echo -e "${RED}Neither docker compose nor docker-compose found${NC}"
+        exit 1
+    fi
+    
     # Check if all containers are running
     FRONTEND_RUNNING=$(docker ps -q -f name=devdocs-frontend)
     BACKEND_RUNNING=$(docker ps -q -f name=devdocs-backend)
@@ -50,9 +69,8 @@ while true; do
     if [ -z "$FRONTEND_RUNNING" ] || [ -z "$BACKEND_RUNNING" ] || [ -z "$MCP_RUNNING" ] || [ -z "$CRAWL4AI_RUNNING" ]; then
         echo -e "${RED}One or more containers have stopped unexpectedly${NC}"
         echo -e "${BLUE}Shutting down services...${NC}"
-        docker-compose down
+        $DOCKER_COMPOSE down
         exit 1
     fi
-    
     sleep 5
 done
