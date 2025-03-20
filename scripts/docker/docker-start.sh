@@ -50,16 +50,6 @@ trap cleanup SIGINT SIGTERM
 # Keep the script running
 echo -e "${BLUE}Monitoring services...${NC}"
 while true; do
-    # Detect which docker compose command to use
-    if command -v docker compose &> /dev/null; then
-        DOCKER_COMPOSE="docker compose"
-    elif command -v docker-compose &> /dev/null; then
-        DOCKER_COMPOSE="docker-compose"
-    else
-        echo -e "${RED}Neither docker compose nor docker-compose found${NC}"
-        exit 1
-    fi
-    
     # Check if all containers are running
     FRONTEND_RUNNING=$(docker ps -q -f name=devdocs-frontend)
     BACKEND_RUNNING=$(docker ps -q -f name=devdocs-backend)
