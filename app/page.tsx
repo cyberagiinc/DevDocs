@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import UrlInput from '@/components/UrlInput'
 import ProcessingBlock from '@/components/ProcessingBlock'
 import SubdomainList from '@/components/SubdomainList'
@@ -11,7 +11,7 @@ import { discoverSubdomains, crawlPages, validateUrl, formatBytes } from '@/lib/
 import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
 import { DiscoveredPage } from '@/lib/types'
-
+import { Button } from '@/components/ui/button'
 export default function Home() {
   const [url, setUrl] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -24,6 +24,113 @@ export default function Home() {
     dataExtracted: '0 KB',
     errorsEncountered: 0
   })
+  // Define the ProgressInfo type to match the one in ProcessingBlock
+  type ProgressStatus = 'idle' | 'discovering' | 'retrying' | 'processing' | 'completed' | 'error';
+  
+  interface ProgressInfo {
+    status: ProgressStatus;
+    message: string;
+    percent: number;
+    elapsedTime: number;
+    estimatedTimeRemaining: number;
+  }
+  
+  // Add state for progress tracking and cancellation
+  const [progress, setProgress] = useState<ProgressInfo>({
+    status: 'idle',
+    message: '',
+    percent: 0,
+    elapsedTime: 0,
+    estimatedTimeRemaining: 0
+  })
+  const [isCancellable, setIsCancellable] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const startTimeRef = useRef<number>(0)
+  
+  // Cleanup function for timers and controllers
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+  
+  // Function to handle cancellation
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      console.log('Cancelling request...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      
+      // Clean up timer
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+      
+      setIsProcessing(false);
+      setIsCancellable(false);
+      setProgress({
+        status: 'idle',
+        message: '',
+        percent: 0,
+        elapsedTime: 0,
+        estimatedTimeRemaining: 0
+      });
+      
+      toast({
+        title: "Request Cancelled",
+        description: "The discovery process was cancelled",
+        variant: "default"
+      });
+    }
+  };
+  
+  // Function to update progress timer
+  const startProgressTimer = () => {
+    startTimeRef.current = Date.now();
+    
+    // Clear any existing timer
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+    }
+    
+    // Start a new timer that updates every second
+    progressTimerRef.current = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      
+      // For long-running requests, provide an estimate
+      // Assuming discovery takes about 5-7 minutes on average
+      const averageTimeSeconds = 6 * 60; // 6 minutes
+      const estimatedProgress = Math.min(95, (elapsedSeconds / averageTimeSeconds) * 100);
+      const estimatedTimeRemaining = Math.max(0, averageTimeSeconds - elapsedSeconds);
+      
+      setProgress(prev => ({
+        ...prev,
+        percent: estimatedProgress,
+        elapsedTime: elapsedSeconds,
+        estimatedTimeRemaining: estimatedTimeRemaining
+      }));
+      
+      // Update message based on elapsed time
+      if (elapsedSeconds > 300) { // 5 minutes
+        setProgress(prev => ({
+          ...prev,
+          message: "This is taking longer than usual. Complex websites may require more time to process."
+        }));
+      } else if (elapsedSeconds > 120) { // 2 minutes
+        setProgress(prev => ({
+          ...prev,
+          message: "Processing a large website. This may take a few more minutes."
+        }));
+      }
+    }, 1000);
+  };
   const { toast } = useToast()
 
   const handleSubmit = async (submittedUrl: string, depth: number) => {
@@ -36,10 +143,30 @@ export default function Home() {
       return
     }
 
+    // Reset state
     setUrl(submittedUrl)
     setIsProcessing(true)
     setMarkdown('')
     setDiscoveredPages([])
+    setIsCancellable(true)
+    
+    // Initialize progress tracking
+    setProgress({
+      status: 'discovering' as ProgressStatus,
+      message: 'Starting discovery process...',
+      percent: 0,
+      elapsedTime: 0,
+      estimatedTimeRemaining: 0
+    })
+    
+    // Start progress timer
+    startProgressTimer()
+    
+    // Create a new AbortController for this request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    abortControllerRef.current = new AbortController()
     
     try {
       console.log('Discovering pages for:', submittedUrl, 'with depth:', depth)
@@ -47,6 +174,11 @@ export default function Home() {
       // Make a direct request to the Next.js API route instead of the backend directly
       // This provides better error handling and logging
       console.log('Making request to Next.js API route: /api/discover')
+      setProgress(prev => ({
+        ...prev,
+        status: 'discovering' as ProgressStatus,
+        message: 'Sending request to discover pages...'
+      }))
       
       const response = await fetch(`/api/discover`, {
         method: 'POST',
@@ -54,9 +186,17 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url: submittedUrl, depth }),
+        signal: abortControllerRef.current.signal
       })
       
       console.log('Response status:', response.status)
+      
+      // Update progress
+      setProgress(prev => ({
+        ...prev,
+        status: 'processing' as ProgressStatus,
+        message: 'Processing response from server...'
+      }))
       
       // Get the response data
       const data = await response.json()
@@ -74,6 +214,13 @@ export default function Home() {
           type: errorType
         })
         
+        // Update progress to show error
+        setProgress(prev => ({
+          ...prev,
+          status: 'error' as ProgressStatus,
+          message: `Error: ${errorMessage}`
+        }))
+        
         // Show a more detailed error toast
         toast({
           title: `Error: ${errorType}`,
@@ -87,13 +234,28 @@ export default function Home() {
       const pages = data.pages || []
       console.log('Discovered pages count:', pages.length)
       
+      // Update progress based on discovery results
       if (pages.length > 0) {
         console.log('First discovered page:', pages[0])
+        
+        // Update progress to show success
+        setProgress(prev => ({
+          ...prev,
+          status: 'completed' as ProgressStatus,
+          percent: 100,
+          message: `Successfully discovered ${pages.length} pages`
+        }))
         
         // Check if any pages have error status
         const errorPages = pages.filter((page: DiscoveredPage) => page.status === 'error')
         if (errorPages.length > 0) {
           console.warn(`${errorPages.length} pages have error status`)
+          
+          // Update progress to show partial success
+          setProgress(prev => ({
+            ...prev,
+            message: `Discovered ${pages.length} pages (${errorPages.length} with errors)`
+          }))
           
           // Show a warning toast if some pages have errors
           toast({
@@ -104,6 +266,14 @@ export default function Home() {
         }
       } else {
         console.warn('No pages were discovered')
+        
+        // Update progress to show no results
+        setProgress(prev => ({
+          ...prev,
+          status: 'completed' as ProgressStatus,
+          percent: 100,
+          message: 'No pages were discovered'
+        }))
         
         // Show a warning toast if no pages were discovered
         toast({
@@ -146,7 +316,22 @@ export default function Home() {
         })
       }
     } finally {
-      setIsProcessing(false)
+      // Clean up timer
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+      
+      // Reset state
+      setIsProcessing(false);
+      setIsCancellable(false);
+      
+      // Keep the progress state for display purposes
+      // but mark it as no longer active
+      setProgress(prev => ({
+        ...prev,
+        status: prev.status === 'error' ? 'error' : 'completed'
+      }));
     }
   }
 
@@ -286,6 +471,9 @@ export default function Home() {
             <ProcessingBlock
               isProcessing={isProcessing || isCrawling}
               stats={stats}
+              progress={progress}
+              isCancellable={isCancellable}
+              onCancel={handleCancel}
             />
           </div>
         </div>
