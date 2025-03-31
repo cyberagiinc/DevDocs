@@ -43,26 +43,108 @@ export default function Home() {
     
     try {
       console.log('Discovering pages for:', submittedUrl, 'with depth:', depth)
-      const pages = await discoverSubdomains({ url: submittedUrl, depth })
-      console.log('Discovered pages:', pages)
+      
+      // Make a direct request to the Next.js API route instead of the backend directly
+      // This provides better error handling and logging
+      console.log('Making request to Next.js API route: /api/discover')
+      
+      const response = await fetch(`/api/discover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: submittedUrl, depth }),
+      })
+      
+      console.log('Response status:', response.status)
+      
+      // Get the response data
+      const data = await response.json()
+      console.log('Response data:', data)
+      
+      if (!response.ok) {
+        // Extract detailed error information if available
+        const errorMessage = data.error || 'Failed to discover pages'
+        const errorDetails = data.details || ''
+        const errorType = data.errorType || 'Unknown'
+        
+        console.error('Error response:', {
+          message: errorMessage,
+          details: errorDetails,
+          type: errorType
+        })
+        
+        // Show a more detailed error toast
+        toast({
+          title: `Error: ${errorType}`,
+          description: errorMessage,
+          variant: "destructive"
+        })
+        
+        throw new Error(errorMessage)
+      }
+      
+      const pages = data.pages || []
+      console.log('Discovered pages count:', pages.length)
+      
+      if (pages.length > 0) {
+        console.log('First discovered page:', pages[0])
+        
+        // Check if any pages have error status
+        const errorPages = pages.filter((page: DiscoveredPage) => page.status === 'error')
+        if (errorPages.length > 0) {
+          console.warn(`${errorPages.length} pages have error status`)
+          
+          // Show a warning toast if some pages have errors
+          toast({
+            title: "Warning",
+            description: `${errorPages.length} pages encountered errors during discovery`,
+            variant: "default"
+          })
+        }
+      } else {
+        console.warn('No pages were discovered')
+        
+        // Show a warning toast if no pages were discovered
+        toast({
+          title: "No Pages Found",
+          description: "The crawler couldn't find any pages to process. This might be due to access restrictions or an invalid URL structure.",
+          variant: "default"
+        })
+      }
       
       setDiscoveredPages(pages)
       setStats(prev => ({
         ...prev,
-        subdomainsParsed: pages.length
+        subdomainsParsed: pages.length,
+        errorsEncountered: pages.filter((page: DiscoveredPage) => page.status === 'error').length
       }))
       
-      toast({
-        title: "Pages Discovered",
-        description: `Found ${pages.length} related pages at depth ${depth}`
-      })
-    } catch (error) {
+      // Only show success toast if pages were actually discovered
+      if (pages.length > 0) {
+        toast({
+          title: "Pages Discovered",
+          description: `Found ${pages.length} related pages at depth ${depth}`
+        })
+      }
+    } catch (error: unknown) {
       console.error('Error discovering pages:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to discover pages",
-        variant: "destructive"
-      })
+      
+      // If we haven't already shown an error toast from the response data
+      if (error instanceof Error && !error.message.includes('Failed to discover pages')) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to discover pages. Check the console for more details.",
+          variant: "destructive"
+        })
+      } else {
+        // Fallback for non-Error objects
+        toast({
+          title: "Error",
+          description: "Failed to discover pages. Check the console for more details.",
+          variant: "destructive"
+        })
+      }
     } finally {
       setIsProcessing(false)
     }
@@ -86,7 +168,31 @@ export default function Home() {
         }))
       )
       
-      const result = await crawlPages(selectedPages)
+      // Make a direct request to the backend API instead of using the crawlPages function
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
+      console.log('Making direct request to backend:', `${backendUrl}/api/crawl`)
+      
+      const response = await fetch(`${backendUrl}/api/crawl`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pages: selectedPages }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to crawl pages')
+      }
+      
+      const data = await response.json()
+      console.log('Crawl response data:', data)
+      
+      const result = {
+        markdown: data.markdown || '',
+        links: data.links || { internal: [], external: [] },
+        error: data.error
+      }
       console.log('Crawl result:', result)
       
       if (result.error) {

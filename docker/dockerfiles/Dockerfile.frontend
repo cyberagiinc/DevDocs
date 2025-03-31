@@ -7,6 +7,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# Set environment variables
+ENV PORT 3001
+ENV BACKEND_URL http://backend:24125
+ENV NEXT_PUBLIC_BACKEND_URL http://backend:24125
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
+
 # Copy the rest of the application
 COPY . .
 
@@ -15,12 +22,6 @@ RUN mkdir -p public
 
 # Next.js build
 RUN npm run build
-
-# Set environment variables
-ENV PORT 3001
-ENV BACKEND_URL http://backend:24125
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
 
 EXPOSE 3001
 

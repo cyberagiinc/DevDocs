@@ -13,7 +13,8 @@ export async function GET(request: Request) {
     }
     
     // Fetch the in-memory file from the backend
-    const response = await fetch(`http://localhost:24125/api/memory-files/${id}`)
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
+    const response = await fetch(`${backendUrl}/api/memory-files/${id}`)
     
     if (!response.ok) {
       const errorData = await response.json()

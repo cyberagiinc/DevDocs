@@ -49,7 +49,8 @@ const MCPServerStatus = () => {
 
     const checkStatus = async () => {
       try {
-        const response = await fetch('http://localhost:24125/api/mcp/status');
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125';
+        const response = await fetch(`${backendUrl}/api/mcp/status`);
         const data = await response.json();
         setStatus({
           status: data.status,
@@ -66,7 +67,8 @@ const MCPServerStatus = () => {
 
     const getLogs = async () => {
       try {
-        const response = await fetch('http://localhost:24125/api/mcp/logs');
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125';
+        const response = await fetch(`${backendUrl}/api/mcp/logs`);
         if (response.ok) {
           const data = await response.json();
           setLogs(data.logs);

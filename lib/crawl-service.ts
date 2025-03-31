@@ -1,10 +1,11 @@
 import { DiscoveredPage, CrawlResult, DiscoverOptions } from './types'
 
-const BACKEND_URL = 'http://localhost:24125'
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
 
 export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): Promise<DiscoveredPage[]> {
   try {
-    console.log('Making request to backend:', `${BACKEND_URL}/api/discover`)
+    // Make a direct request to the backend API instead of going through the Next.js API route
+    console.log('Making direct request to backend:', `${BACKEND_URL}/api/discover`)
     console.log('Request payload:', { url, depth })
 
     const response = await fetch(`${BACKEND_URL}/api/discover`, {

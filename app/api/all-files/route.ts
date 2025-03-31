@@ -90,7 +90,8 @@ export async function GET(request: Request) {
     // Get in-memory files from the backend
     let memoryFiles = []
     try {
-      const memoryResponse = await fetch('http://localhost:24125/api/memory-files')
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
+      const memoryResponse = await fetch(`${backendUrl}/api/memory-files`)
       if (memoryResponse.ok) {
         const memoryData = await memoryResponse.json()
         if (memoryData.success && Array.isArray(memoryData.files)) {

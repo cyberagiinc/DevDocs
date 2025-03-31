@@ -8,6 +8,7 @@ services:
       - "3001:3001"
     environment:
       - BACKEND_URL=http://backend:24125
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:24125
       - MCP_HOST=mcp
     depends_on:
       - backend

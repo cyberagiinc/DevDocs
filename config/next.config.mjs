@@ -25,6 +25,7 @@ const nextConfig = {
   env: {
     BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:24125',
     MCP_HOST: process.env.MCP_HOST || 'localhost',
+    NEXT_PUBLIC_BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:24125',
   },
 }
 

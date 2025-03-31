@@ -335,54 +335,159 @@ async def discover_pages(
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(2)
             crawl4ai_host = CRAWL4AI_URL.split('//')[1].split(':')[0]
-            logger.info(f"Attempting to connect to {crawl4ai_host}:11235")
-            result = s.connect_ex((crawl4ai_host, 11235))
+            crawl4ai_port = int(CRAWL4AI_URL.split(':')[-1])
+            logger.info(f"Attempting to connect to {crawl4ai_host}:{crawl4ai_port}")
+            result = s.connect_ex((crawl4ai_host, crawl4ai_port))
             s.close()
             
             if result == 0:
-                logger.info(f"Successfully connected to {crawl4ai_host}:11235")
+                logger.info(f"Successfully connected to {crawl4ai_host}:{crawl4ai_port}")
             else:
-                logger.error(f"Could not connect to {crawl4ai_host}:11235, error code: {result}")
-                raise Exception(f"Could not connect to {crawl4ai_host}:11235")
+                logger.error(f"Could not connect to {crawl4ai_host}:{crawl4ai_port}, error code: {result}")
+                # Instead of raising an exception, return a page with error status
+                # This allows the frontend to display the error instead of failing silently
+                return [DiscoveredPage(
+                    url=url,
+                    title=f"Connection Error: Could not connect to Crawl4AI service at {crawl4ai_host}:{crawl4ai_port}",
+                    status="error",
+                    internalLinks=[]
+                )]
             
             # Now make the actual request
+            logger.info(f"Sending POST request to {CRAWL4AI_URL}/crawl")
             response = requests.post(
-                f"{CRAWL4AI_URL}/crawl", 
-                headers=headers, 
+                f"{CRAWL4AI_URL}/crawl",
+                headers=headers,
                 json=simple_request,
                 timeout=30
             )
+            
+            # Log the response status and headers
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {response.headers}")
+            
+            # Check if the response is valid JSON
+            try:
+                response_json = response.json()
+                logger.info(f"Response JSON: {response_json}")
+            except Exception as json_error:
+                logger.error(f"Response is not valid JSON: {str(json_error)}")
+                logger.error(f"Response text: {response.text[:500]}")
+                # Return a page with error status
+                return [DiscoveredPage(
+                    url=url,
+                    title=f"Invalid Response: Crawl4AI service returned invalid JSON",
+                    status="error",
+                    internalLinks=[]
+                )]
+            
             response.raise_for_status()
-            task_id = response.json()["task_id"]
+            task_id = response_json.get("task_id")
+            
+            if not task_id:
+                logger.error(f"No task_id in response: {response_json}")
+                # Return a page with error status
+                return [DiscoveredPage(
+                    url=url,
+                    title=f"Invalid Response: No task_id in Crawl4AI response",
+                    status="error",
+                    internalLinks=[]
+                )]
+                
             logger.info(f"Submitted crawl job for {url}, task ID: {task_id}")
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed: {str(e)}")
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response status: {e.response.status_code}")
                 logger.error(f"Response body: {e.response.text[:500]}")
-            raise
+            
+            # Return a page with error status instead of raising an exception
+            return [DiscoveredPage(
+                url=url,
+                title=f"Request Error: {str(e)}",
+                status="error",
+                internalLinks=[]
+            )]
         except Exception as e:
             logger.error(f"Connection error: {str(e)}")
-            raise
+            
+            # Return a page with error status instead of raising an exception
+            return [DiscoveredPage(
+                url=url,
+                title=f"Connection Error: {str(e)}",
+                status="error",
+                internalLinks=[]
+            )]
         
         # Poll for result with increased frequency and longer total timeout
         result = None
         max_attempts = 120  # Increased from 60 to 120 for complex URLs
         poll_interval = 1  # Keep at 1 second
+        polling_errors = 0  # Track consecutive polling errors
+        
+        logger.info(f"Starting to poll for task {task_id} result (max attempts: {max_attempts})")
         for attempt in range(max_attempts):
             logger.info(f"Polling for task {task_id} result (attempt {attempt+1}/{max_attempts})")
             try:
+                # Log the polling request details
+                poll_url = f"{CRAWL4AI_URL}/task/{task_id}"
+                logger.info(f"Sending GET request to {poll_url}")
+                
                 status_response = requests.get(
-                    f"{CRAWL4AI_URL}/task/{task_id}",
+                    poll_url,
                     headers=headers,
                     timeout=10
                 )
+                
+                # Log the response status and headers
+                logger.info(f"Poll response status code: {status_response.status_code}")
+                
+                # Check if the response is valid JSON
+                try:
+                    status = status_response.json()
+                    logger.info(f"Poll response JSON: {status}")
+                except Exception as json_error:
+                    logger.error(f"Poll response is not valid JSON: {str(json_error)}")
+                    logger.error(f"Poll response text: {status_response.text[:500]}")
+                    polling_errors += 1
+                    
+                    # If we've had too many consecutive errors, return an error page
+                    if polling_errors >= 5:
+                        logger.error(f"Too many consecutive polling errors ({polling_errors}), giving up")
+                        return [DiscoveredPage(
+                            url=url,
+                            title=f"Polling Error: Invalid JSON response from Crawl4AI service",
+                            status="error",
+                            internalLinks=[]
+                        )]
+                    
+                    # Otherwise, wait and try again
+                    await asyncio.sleep(poll_interval)
+                    continue
+                
                 status_response.raise_for_status()
-                status = status_response.json()
+                
+                # Reset the error counter on successful response
+                polling_errors = 0
+                
+                # Check if status field exists
+                if "status" not in status:
+                    logger.error(f"No 'status' field in response: {status}")
+                    continue
                 
                 logger.info(f"Task {task_id} status: {status['status']}")
                 
                 if status["status"] == "completed":
+                    # Check if result field exists
+                    if "result" not in status:
+                        logger.error(f"Task completed but no 'result' field in response: {status}")
+                        return [DiscoveredPage(
+                            url=url,
+                            title=f"Invalid Response: No result in completed task response",
+                            status="error",
+                            internalLinks=[]
+                        )]
+                    
                     result = status["result"]
                     logger.info(f"Task {task_id} completed successfully")
                     
@@ -396,7 +501,12 @@ async def discover_pages(
                         # Skip any code that might try to write to crawl_results
                         if "crawl_results" in str(task_id):
                             logger.warning(f"Attempted to create file in crawl_results directory - skipping")
-                            return
+                            return [DiscoveredPage(
+                                url=url,
+                                title="Configuration Error",
+                                status="error",
+                                internalLinks=[]
+                            )]
                         
                         # Use the root_task_id for file naming to consolidate all related content
                         file_id = root_task_id if root_task_id else task_id
@@ -477,17 +587,52 @@ async def discover_pages(
                             with open(metadata_file, 'w') as f:
                                 json.dump(metadata, f, indent=2)
                             logger.info(f"Updated metadata in {metadata_file}")
+                        else:
+                            logger.warning(f"No markdown content in result for task {task_id}")
                     except Exception as e:
                         logger.error(f"Error saving result to files: {str(e)}")
+                        logger.error(f"Error details: {str(e)}", exc_info=True)
                     
                     break
                 elif status["status"] == "failed":
-                    logger.error(f"Task {task_id} failed: {status.get('error', 'Unknown error')}")
-                    break
+                    error_message = status.get('error', 'Unknown error')
+                    logger.error(f"Task {task_id} failed: {error_message}")
+                    return [DiscoveredPage(
+                        url=url,
+                        title=f"Task Failed: {error_message}",
+                        status="error",
+                        internalLinks=[]
+                    )]
                 elif status["status"] == "running":
                     logger.info(f"Task {task_id} is still running")
+                else:
+                    logger.warning(f"Unknown task status: {status['status']}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request error polling task {task_id}: {str(e)}")
+                polling_errors += 1
+                
+                # If we've had too many consecutive errors, return an error page
+                if polling_errors >= 5:
+                    logger.error(f"Too many consecutive polling errors ({polling_errors}), giving up")
+                    return [DiscoveredPage(
+                        url=url,
+                        title=f"Polling Error: {str(e)}",
+                        status="error",
+                        internalLinks=[]
+                    )]
             except Exception as e:
                 logger.error(f"Error polling task {task_id}: {str(e)}")
+                polling_errors += 1
+                
+                # If we've had too many consecutive errors, return an error page
+                if polling_errors >= 5:
+                    logger.error(f"Too many consecutive polling errors ({polling_errors}), giving up")
+                    return [DiscoveredPage(
+                        url=url,
+                        title=f"Polling Error: {str(e)}",
+                        status="error",
+                        internalLinks=[]
+                    )]
                 
             await asyncio.sleep(poll_interval)
         
@@ -496,7 +641,7 @@ async def discover_pages(
             # Return a basic page with error status
             return [DiscoveredPage(
                 url=url,
-                title="Timeout Error",
+                title="Timeout Error: Crawl4AI service did not complete the task in time",
                 status="error",
                 internalLinks=[]
             )]

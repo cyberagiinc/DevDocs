@@ -484,35 +484,82 @@ async def discover_endpoint(request: DiscoverRequest):
     try:
         logger.info(f"Received discover request for URL: {request.url} with depth: {request.depth}")
         
+        # Log environment variables for debugging
+        logger.info(f"CRAWL4AI_URL: {os.environ.get('CRAWL4AI_URL', 'Not set')}")
+        logger.info(f"CRAWL4AI_API_TOKEN: {'Set' if os.environ.get('CRAWL4AI_API_TOKEN') else 'Not set'}")
+        
+        # Check if Crawl4AI service is reachable
+        try:
+            crawl4ai_url = os.environ.get("CRAWL4AI_URL", "http://crawl4ai:11235")
+            logger.info(f"Testing connection to Crawl4AI service at {crawl4ai_url}")
+            
+            # Try to ping the Crawl4AI service
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2)
+            crawl4ai_host = crawl4ai_url.split('//')[1].split(':')[0]
+            crawl4ai_port = int(crawl4ai_url.split(':')[-1])
+            logger.info(f"Attempting to connect to {crawl4ai_host}:{crawl4ai_port}")
+            result = s.connect_ex((crawl4ai_host, crawl4ai_port))
+            s.close()
+            
+            if result == 0:
+                logger.info(f"Successfully connected to Crawl4AI service at {crawl4ai_host}:{crawl4ai_port}")
+            else:
+                logger.error(f"Could not connect to Crawl4AI service at {crawl4ai_host}:{crawl4ai_port}, error code: {result}")
+                # Continue anyway, as the discover_pages function will handle connection errors
+        except Exception as conn_error:
+            logger.error(f"Error checking Crawl4AI service connection: {str(conn_error)}")
+            # Continue anyway, as the discover_pages function will handle connection errors
+        
         # The root URL is the URL provided in the request
         root_url = request.url
         logger.info(f"Using root URL for consolidated files: {root_url}")
         
+        # Call discover_pages with detailed logging
+        logger.info(f"Calling discover_pages with URL: {request.url}, depth: {request.depth}, root_url: {root_url}")
         pages = await discover_pages(request.url, max_depth=request.depth, root_url=root_url)
         
         # Log the results
         if pages:
             logger.info(f"Successfully discovered {len(pages)} pages")
-            for page in pages:
-                logger.debug(f"Discovered page: {page.url} ({page.status})")
+            for i, page in enumerate(pages[:5]):  # Log first 5 pages to avoid excessive logging
+                logger.info(f"Discovered page {i+1}: {page.url} ({page.status})")
+                if page.internalLinks:
+                    logger.info(f"  Page {i+1} has {len(page.internalLinks)} internal links")
+            if len(pages) > 5:
+                logger.info(f"... and {len(pages) - 5} more pages")
         else:
-            logger.warning("No pages discovered")
+            logger.warning("No pages discovered - this might indicate an issue with the crawler")
             
         # Always return a valid response, even if no pages were found
-        return {
+        response_data = {
             "pages": pages or [],  # Ensure we always return an array
             "message": f"Found {len(pages)} pages" if pages else "No pages discovered",
             "success": True
         }
+        logger.info(f"Returning response with {len(response_data['pages'])} pages")
+        return response_data
     except Exception as e:
         logger.error(f"Error discovering pages: {str(e)}", exc_info=True)
+        
+        # Log more detailed error information
+        if isinstance(e, requests.exceptions.RequestException):
+            logger.error(f"Request exception details: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response body: {e.response.text[:500]}")
+        
         # Return a structured error response
-        return {
+        error_response = {
             "pages": [],
             "message": f"Error discovering pages: {str(e)}",
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "error_type": type(e).__name__
         }
+        logger.info(f"Returning error response: {error_response}")
+        return error_response
 
 @app.post("/api/crawl")
 async def crawl_endpoint(request: CrawlRequest):
