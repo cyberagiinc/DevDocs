@@ -17,9 +17,9 @@ mkdir -p crawl_results
 chmod -R 777 logs storage crawl_results
 
 # Detect which docker compose command to use
-if command -v docker compose &> /dev/null; then
+if docker compose version &>/dev/null; then
     DOCKER_COMPOSE="docker compose"
-elif command -v docker-compose &> /dev/null; then
+elif command -v docker-compose &>/dev/null; then
     DOCKER_COMPOSE="docker-compose"
 else
     echo -e "${RED}Neither docker compose nor docker-compose found${NC}"
@@ -40,7 +40,7 @@ echo -e "${BLUE}Press Ctrl+C to stop all services${NC}"
 # Handle graceful shutdown
 cleanup() {
     echo -e "\n${BLUE}Shutting down services...${NC}"
-    docker-compose down
+    $DOCKER_COMPOSE down
     echo -e "${GREEN}All services stopped${NC}"
     exit 0
 }
