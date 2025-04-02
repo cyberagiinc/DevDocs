@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, validator
 from typing import List
 import uvicorn
@@ -11,7 +12,7 @@ import json
 import asyncio
 from pathlib import Path
 from datetime import datetime
-from .crawler import discover_pages, crawl_pages, DiscoveredPage, CrawlResult, url_to_filename, in_memory_files, is_individual_file
+from .crawler import discover_pages, crawl_pages, DiscoveredPage, CrawlResult, url_to_filename
 
 # Configure logging
 logging.basicConfig(
@@ -377,86 +378,40 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
             "status": "error",
             "error": f"Error testing Crawl4AI: {str(e)}"
         }
+# Removed /api/memory-files and /api/memory-files/{file_id} endpoints
 
-@app.get("/api/memory-files")
-async def list_memory_files():
-    """List all files stored in memory"""
-    try:
-        logger.info("Listing in-memory files")
-        
-        # Convert the in-memory files to a list of file details
-        file_details = []
-        for filename, file_data in in_memory_files.items():
-            # Extract the file ID (without extension)
-            file_id = os.path.basename(filename)
-            if file_id.endswith('.md'):
-                file_id = file_id[:-3]
-            elif file_id.endswith('.json'):
-                file_id = file_id[:-5]
-                
-            # Get the content and metadata
-            content = file_data.get('content', '')
-            metadata = file_data.get('metadata', {})
-            timestamp = file_data.get('timestamp', datetime.now().isoformat())
-            
-            # Check if this is a JSON file
-            is_json = filename.endswith('.json')
-            
-            # Add the file details
-            file_details.append({
-                'name': file_id,
-                'path': filename,
-                'timestamp': timestamp,
-                'size': len(content),
-                'wordCount': len(content.split()) if not is_json else 0,
-                'charCount': len(content),
-                'isInMemory': True,
-                'isJson': is_json,
-                'metadata': metadata
-            })
-        
-        logger.info(f"Found {len(file_details)} in-memory files")
-        return {
-            'success': True,
-            'files': file_details
-        }
-    except Exception as e:
-        logger.error(f"Error listing in-memory files: {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e),
-            'files': []
-        }
+STORAGE_DIR = Path("storage/markdown")
 
-@app.get("/api/memory-files/{file_id}")
-async def get_memory_file(file_id: str):
-    """Get the content of a file stored in memory"""
+@app.get("/api/storage/file-content")
+async def get_storage_file_content(file_path: str = Query(..., description="Relative path to the file within storage/markdown")):
+    """Reads and returns the content of a file from the storage/markdown directory."""
     try:
-        logger.info(f"Retrieving in-memory file: {file_id}")
-        
-        # Check if the file exists in memory
-        for filename, file_data in in_memory_files.items():
-            if filename.endswith(file_id) or os.path.basename(filename).startswith(file_id):
-                content = file_data.get('content', '')
-                logger.info(f"Found in-memory file: {filename}")
-                return {
-                    'success': True,
-                    'content': content,
-                    'metadata': file_data.get('metadata', {})
-                }
-        
-        # If we get here, the file wasn't found
-        logger.warning(f"In-memory file not found: {file_id}")
-        return {
-            'success': False,
-            'error': f"File not found: {file_id}"
-        }
+        # Security: Normalize path and prevent directory traversal
+        base_path = STORAGE_DIR.resolve()
+        # Ensure file_path is treated as relative to base_path
+        requested_path = (base_path / file_path).resolve()
+
+        # Check if the resolved path is still within the intended storage directory
+        if not str(requested_path).startswith(str(base_path)):
+             logger.warning(f"Attempted directory traversal: {file_path}")
+             raise HTTPException(status_code=400, detail="Invalid file path")
+
+        if not requested_path.is_file():
+            logger.warning(f"Requested storage file not found: {requested_path}")
+            raise HTTPException(status_code=404, detail="File not found")
+
+        logger.info(f"Reading storage file: {requested_path}")
+        content = requested_path.read_text(encoding='utf-8')
+        # Return as plain text, assuming frontend handles markdown rendering
+        return PlainTextResponse(content=content)
+
+    except HTTPException as http_exc:
+        # Re-raise HTTPExceptions directly
+        raise http_exc
     except Exception as e:
-        logger.error(f"Error retrieving in-memory file: {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(f"Error reading storage file {file_path}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+# Removed stray brace
 
 @app.get("/api/mcp/logs", response_model=MCPLogsResponse)
 async def get_mcp_logs():

@@ -9,7 +9,6 @@ description = "Fast MCP server for markdown content management with automatic fi
 authors = [
     { name = "CyberAGI Team" }
 ]
-readme = "README_MCP.md"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.2.0",

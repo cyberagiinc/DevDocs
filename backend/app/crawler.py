@@ -111,164 +111,26 @@ def url_to_filename(url: str) -> str:
     logger.info(f"Converted URL '{url}' to filename '{filename}'")
     return filename
 
-# In-memory storage for individual files
-# Structure: {filename: {'content': str, 'metadata': dict, 'timestamp': str}}
-in_memory_files = {}
+# In-memory storage removed
 
-class MemoryFileObject:
-    """A file-like object that stores content in memory instead of writing to disk"""
-    def __init__(self, filename):
-        self.filename = filename
-        self.buffer = []
-        
-    def write(self, content):
-        self.buffer.append(content)
-        return len(content)
-        
-    def close(self):
-        # Store the content in memory
-        in_memory_files[self.filename] = {
-            'content': ''.join(self.buffer),
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # If this is a JSON file, parse and store metadata
-        if self.filename.endswith('.json'):
-            try:
-                metadata = json.loads(''.join(self.buffer))
-                in_memory_files[self.filename]['metadata'] = metadata
-            except Exception as e:
-                logger.error(f"Error parsing JSON for in-memory file {self.filename}: {str(e)}")
-        
-        logger.info(f"Stored file in memory: {self.filename}")
-                
-    def __enter__(self):
-        return self
-        
-    def __exit__(self, *args):
-        self.close()
-        
-    def read(self):
-        if self.filename in in_memory_files:
-            return in_memory_files[self.filename]['content']
-        return ""
+# MemoryFileObject class removed
 
-def is_individual_file(path: str) -> bool:
-    """
-    Determine if a file is an individual file (not a consolidated file).
-    Individual files are those that have UUIDs as filenames.
-    """
-    filename = os.path.basename(path)
-    # Check if the filename looks like a UUID
-    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|md)$'
-    return bool(re.match(uuid_pattern, filename))
+# is_individual_file function removed
 
-def is_consolidated_file(path: str) -> bool:
-    """
-    Determine if a file is a consolidated file.
-    Consolidated files are those in storage/markdown that are not UUIDs.
-    """
-    if "storage/markdown" not in path:
-        return False
-        
-    return not is_individual_file(path)
+# is_consolidated_file function removed
 
-# Create a function to redirect writes from crawl_results to storage/markdown
-def redirect_file_writes(path: str, content=None, task_id=None, root_url=None) -> str:
-    """
-    If a file is being written to crawl_results, redirect it to storage/markdown or memory.
-    Returns the original path for non-crawl_results files, or the redirected path for crawl_results files.
-    
-    If content and task_id are provided, this function will also handle consolidation.
-    """
-    if "crawl_results" in path:
-        # Extract the filename from the path
-        filename = os.path.basename(path)
-        
-        # Check if this is an individual file (UUID pattern)
-        if is_individual_file(path):
-            # Keep individual files in memory
-            logger.info(f"Keeping individual file in memory: {path}")
-            # We'll return the original path, but the redirecting_open function will intercept it
-            # and use a MemoryFileObject instead of writing to disk
-            return path
-        
-        # If this is a markdown file and we have content and task_id, we'll consolidate it
-        if filename.endswith('.md') and content and task_id:
-            # Generate a consistent file ID based on the root URL
-            if root_url:
-                file_id = url_to_filename(root_url)
-                logger.info(f"Using file ID {file_id} for consolidation based on root URL: {root_url}")
-            else:
-                # If no root_url is provided, use the task_id
-                file_id = task_id
-                logger.info(f"Using task ID {task_id} as file ID for consolidation (no root URL provided)")
-            
-            # Create the consolidated file path
-            consolidated_path = os.path.join("storage/markdown", f"{file_id}.md")
-            
-            # We'll return the consolidated path, but the actual consolidation will be handled elsewhere
-            logger.info(f"Redirecting markdown file from {path} to consolidated file: {consolidated_path}")
-            return consolidated_path
-        
-        # For other files, just redirect to storage/markdown
-        redirected_path = os.path.join("storage/markdown", filename)
-        logger.info(f"Redirecting file from {path} to {redirected_path}")
-        return redirected_path
-    
-    return path
+# redirect_file_writes function removed
 
-# Store task context for file redirection
-_task_context = {
-    'current_task_id': None,
-    'current_root_url': None,
-    'current_content': None
-}
+# _task_context removed
 
-def set_task_context(task_id=None, root_url=None, content=None):
-    """Set the current task context for file redirection"""
-    if task_id:
-        _task_context['current_task_id'] = task_id
-    if root_url:
-        _task_context['current_root_url'] = root_url
-    if content:
-        _task_context['current_content'] = content
-    logger.info(f"Task context set: task_id={task_id}, root_url={root_url}, content_length={len(content) if content else 0}")
+# set_task_context function removed
 
-# Monkey patch the open function to redirect writes from crawl_results to storage/markdown
-original_open = open
-def redirecting_open(file, mode='r', *args, **kwargs):
-    if 'w' in mode:
-        # Check if this is an individual file that should be kept in memory
-        if "crawl_results" in str(file) and is_individual_file(file):
-            logger.info(f"Using MemoryFileObject for {file}")
-            return MemoryFileObject(file)
-        
-        # For other files, redirect the path if needed
-        file = redirect_file_writes(
-            file,
-            content=_task_context.get('current_content'),
-            task_id=_task_context.get('current_task_id'),
-            root_url=_task_context.get('current_root_url')
-        )
-    elif 'r' in mode:
-        # For read operations, check if the file exists in memory first
-        if is_individual_file(file) and file in in_memory_files:
-            logger.info(f"Reading from in-memory file: {file}")
-            return MemoryFileObject(file)
-    
-    # For all other cases, use the original open function
-    return original_open(file, mode, *args, **kwargs)
-
-# Replace the built-in open function with our redirecting version
-import builtins
-builtins.open = redirecting_open
+# Monkey patch for open function removed
 
 # Ensure storage/markdown directory exists
 os.makedirs("storage/markdown", exist_ok=True)
 
-# Log that we're redirecting files
-logger.info("File redirection active: All files from crawl_results will be redirected to storage/markdown")
+# File redirection logging removed
 
 async def discover_pages(
     url: str,
@@ -404,12 +266,7 @@ async def discover_pages(
                         # We no longer save individual files, only consolidated ones
                         logger.info(f"Skipping individual file creation for task {task_id} - using consolidated approach only")
                         
-                        # Set the task context for file redirection
-                        set_task_context(
-                            task_id=task_id,
-                            root_url=root_url,
-                            content=result.get("markdown", "")
-                        )
+                        # Task context setting removed
                         
                         # Extract the markdown content if available
                         if "markdown" in result and result["markdown"]:
