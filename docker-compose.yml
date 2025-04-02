@@ -1,1 +1,74 @@
-docker/compose/docker-compose.yml
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.frontend
+    container_name: devdocs-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - BACKEND_URL=http://backend:24125
+      - MCP_HOST=mcp
+    depends_on:
+      - backend
+    networks:
+      - devdocs-network
+    restart: unless-stopped
+  backend:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.backend
+    container_name: devdocs-backend
+    ports:
+      - "24125:24125"
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+      - ./crawl_results:/app/crawl_results
+    environment:
+      - MCP_HOST=mcp
+      - CRAWL4AI_URL=http://crawl4ai:11235
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-devdocs-demo-key}
+    depends_on:
+      - crawl4ai
+      - mcp
+    networks:
+      - devdocs-network
+    restart: unless-stopped
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.mcp
+    container_name: devdocs-mcp
+    volumes:
+      - ./storage/markdown:/app/storage/markdown
+      - ./logs:/app/logs
+    networks:
+      - devdocs-network
+    stdin_open: true  # Keep stdin open
+    tty: true  # Allocate a pseudo-TTY
+    restart: unless-stopped
+  crawl4ai:
+    image: unclecode/crawl4ai:all
+    container_name: devdocs-crawl4ai
+    ports:
+      - "11235:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-devdocs-demo-key}
+      - MAX_CONCURRENT_TASKS=5
+      - DISABLE_AUTH=false
+    volumes:
+      - /dev/shm:/dev/shm
+      - ./crawl_results:/app/crawl_results
+    networks:
+      - devdocs-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+networks:
+  devdocs-network:
+    driver: bridge
