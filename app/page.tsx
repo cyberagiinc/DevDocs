@@ -12,6 +12,17 @@ import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
 import { DiscoveredPage } from '@/lib/types'
 
+/**
+ * Renders the main interface for the DevDocs application.
+ *
+ * This component provides the entry point for users to discover, crawl, and extract documentation
+ * from a specified URL. It validates user input, triggers API requests via Next.js API routes
+ * to retrieve and crawl pages, and manages state to display processing status, discovered pages,
+ * extracted markdown content, and related statistics. Child components handle URL input,
+ * status display, subdomain listing, markdown output, stored files, and configuration settings.
+ *
+ * @returns The rendered Home component as JSX.
+ */
 export default function Home() {
   const [url, setUrl] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -168,11 +179,10 @@ export default function Home() {
         }))
       )
       
-      // Make a direct request to the backend API instead of using the crawlPages function
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
-      console.log('Making direct request to backend:', `${backendUrl}/api/crawl`)
+      // Use the Next.js API route instead of direct backend request
+      console.log('Making request to Next.js API route: /api/crawl')
       
-      const response = await fetch(`${backendUrl}/api/crawl`, {
+      const response = await fetch(`/api/crawl`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
