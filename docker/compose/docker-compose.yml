@@ -29,7 +29,7 @@ services:
       - ./crawl_results:/app/crawl_results
     environment:
       - MCP_HOST=mcp
-      - CRAWL4AI_URL=http://crawl4ai:11235
+      - CRAWL4AI_URL=http://devdocs-crawl4ai:11235
       - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-devdocs-demo-key}
     depends_on:
       - crawl4ai
