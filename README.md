@@ -93,6 +93,14 @@ DevDocs brings documentation to you. Point it at any tech documentation URL, and
 
 DevDocs is designed to be easy to use with Docker, requiring minimal setup for new users.
 
+### Installing via Smithery
+
+To install DevDocs for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@cyberagiinc/DevDocs):
+
+```bash
+npx -y @smithery/cli install @cyberagiinc/DevDocs --client claude
+```
+
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed on your system
