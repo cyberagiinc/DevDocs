@@ -41,8 +41,23 @@ export async function GET(request: Request) {
       const mdFiles = files.filter(f => f.endsWith('.md'))
       const jsonFiles = files.filter(f => f.endsWith('.json'))
       
+      // Define interface for disk file details
+      interface DiskFileDetail {
+        name: string;
+        jsonPath: string;
+        markdownPath: string;
+        timestamp: Date;
+        size: number;
+        wordCount: number;
+        charCount: number;
+        isConsolidated: boolean;
+        pagesCount: number;
+        rootUrl: string;
+        isInMemory: boolean;
+      }
+
       // Get disk files
-      const diskFileDetails = await Promise.all(
+      const diskFileDetails: DiskFileDetail[] = await Promise.all(
         mdFiles.map(async (filename) => {
           const mdPath = path.join(STORAGE_DIR, filename)
           const jsonPath = path.join(STORAGE_DIR, filename.replace('.md', '.json'))
@@ -117,41 +132,13 @@ export async function GET(request: Request) {
         metadata?: any;
       }
       
-      // Get in-memory files from the backend
-      let memoryFiles = []
-      try {
-        const memoryResponse = await fetch('http://localhost:24125/api/memory-files')
-        if (memoryResponse.ok) {
-          const memoryData = await memoryResponse.json()
-          if (memoryData.success && Array.isArray(memoryData.files)) {
-            // Convert in-memory files to the same format as disk files
-            memoryFiles = memoryData.files
-              .filter((file: MemoryFile) => !file.isJson) // Only include markdown files
-              .map((file: MemoryFile) => ({
-                name: file.name,
-                jsonPath: file.path.replace('.md', '.json'),
-                markdownPath: file.path,
-                timestamp: new Date(file.timestamp),
-                size: file.size,
-                wordCount: file.wordCount,
-                charCount: file.charCount,
-                isConsolidated: false,
-                pagesCount: 1,
-                rootUrl: '',
-                isInMemory: true
-              }))
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching in-memory files:', e)
-      }
-      
-      // Combine disk and memory files
-      const allFiles = [...diskFileDetails, ...memoryFiles]
-      
+      // Removed fetching and combining of in-memory files as that feature was removed.
+      // We now only work with files read from disk.
+      const allFiles = diskFileDetails // Keep variable name for minimal diff, even though it's just disk files now
+
       // Filter out individual files (non-consolidated files)
       // Only show consolidated files in the Stored Files section
-      const consolidatedFiles = allFiles.filter(file => file.isConsolidated)
+      const consolidatedFiles = allFiles.filter((file: DiskFileDetail) => file.isConsolidated)
       
       return NextResponse.json({
         success: true,

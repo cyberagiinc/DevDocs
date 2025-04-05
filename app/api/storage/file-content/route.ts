@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import { type NextRequest } from 'next/server'
 
 // Determine backend URL (consider containerized vs. local development)
-// In Docker, use the service name. Locally, use localhost.
-const backendHost = process.env.BACKEND_URL || 'http://localhost:24125'; 
+// In Docker, use the service name 'backend'. Locally, use localhost.
+// Force using the service name for Docker context, as env var might not be reliable here.
+const backendHost = 'http://backend:24125';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const filePath = searchParams.get('path'); // Expecting path relative to storage/markdown
+    const filePath = searchParams.get('file_path'); // Expecting file_path relative to storage/markdown
 
     if (!filePath) {
       return NextResponse.json(
