@@ -2,6 +2,8 @@ import logging
 from pydantic import BaseModel, Field # Removed Dict import
 from typing import Optional, Dict # Keep Dict from typing for clarity if preferred, or remove if using dict[]
 from datetime import datetime
+# Import normalize_url from crawler
+from .utils import normalize_url # Import from utils
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,13 @@ def initialize_job(job_id: str, root_url: str):
     """Initializes a new job status."""
     if job_id in crawl_jobs:
         logger.warning(f"Job ID {job_id} already exists. Re-initializing.")
+    normalized_root_url = normalize_url(root_url) # Normalize before use
     crawl_jobs[job_id] = CrawlJobStatus(
         job_id=job_id,
         overall_status='initializing',
-        urls={root_url: 'pending_discovery'},
+        urls={normalized_root_url: 'pending_discovery'}, # Use normalized URL as key
         start_time=datetime.now(),
-        root_url=root_url
+        root_url=normalized_root_url # Store normalized URL
     )
     logger.info(f"Initialized job {job_id} for root URL {root_url}")
 
@@ -52,11 +55,12 @@ def update_overall_status(job_id: str, status: str, error_message: Optional[str]
 def update_url_status(job_id: str, url: str, status: str):
     """Updates the status of a specific URL within a job."""
     if job_id in crawl_jobs:
+        normalized_url = normalize_url(url) # Normalize before use
         # Ensure the URL dictionary exists
         if crawl_jobs[job_id].urls is None:
              crawl_jobs[job_id].urls = {}
-        crawl_jobs[job_id].urls[url] = status
-        logger.debug(f"Job {job_id} URL status updated: {url} -> {status}")
+        crawl_jobs[job_id].urls[normalized_url] = status # Use normalized URL as key
+        logger.debug(f"Job {job_id} URL status updated: {normalized_url} -> {status}")
     else:
         logger.error(f"Attempted to update URL status for non-existent job ID: {job_id}")
 
@@ -66,9 +70,10 @@ def add_pending_crawl_urls(job_id: str, urls: list[str]):
         if crawl_jobs[job_id].urls is None:
              crawl_jobs[job_id].urls = {}
         for url in urls:
-             # Only add if not already present with a final status
-             if url not in crawl_jobs[job_id].urls or crawl_jobs[job_id].urls[url] not in ['completed', 'crawl_error', 'discovery_error']:
-                crawl_jobs[job_id].urls[url] = 'pending_crawl'
+             normalized_url = normalize_url(url) # Normalize before use
+             # Only add if not already present with a final status (using normalized key)
+             if normalized_url not in crawl_jobs[job_id].urls or crawl_jobs[job_id].urls[normalized_url] not in ['completed', 'crawl_error', 'discovery_error']:
+                crawl_jobs[job_id].urls[normalized_url] = 'pending_crawl' # Use normalized URL as key
         logger.info(f"Added {len(urls)} URLs as pending_crawl for job {job_id}")
     else:
          logger.error(f"Attempted to add pending URLs for non-existent job ID: {job_id}")

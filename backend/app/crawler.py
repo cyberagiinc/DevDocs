@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlparse, urlsplit
 import re
 # Import status management functions
 from .status_manager import update_overall_status, update_url_status # Removed set_task_context import
+from .utils import normalize_url # Import from utils
 
 
 # Configure logging
@@ -54,13 +55,7 @@ class CrawlResult(BaseModel):
     markdown: str
     stats: CrawlStats
 
-def normalize_url(url: str) -> str:
-    """Normalize URL by removing trailing slashes and fragments"""
-    parsed = urlparse(url)
-    path = parsed.path.rstrip('/')
-    if not path:
-        path = '/'
-    return f"{parsed.scheme}://{parsed.netloc}{path}"
+# normalize_url function moved to utils.py
 
 def url_to_filename(url: str) -> str:
     """

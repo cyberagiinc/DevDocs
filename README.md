@@ -107,18 +107,36 @@ git clone https://github.com/cyberagiinc/DevDocs.git
 
 # Navigate to the project directory
 cd DevDocs
+# Configure environment variables
+# Copy the template file to .env
+cp .env.template .env
+# Ensure NEXT_PUBLIC_BACKEND_URL in .env is set correctly (e.g., http://localhost:24125)
+# This allows the frontend (running in your browser) to communicate with the backend service.
+
 
 # Start all services using Docker
 ./docker-start.sh
 ```
 
-For Windows users:
+For Windows users: Experimental Only (Not Tested Yet)
 ```cmd
 # Clone the repository
 git clone https://github.com/cyberagiinc/DevDocs.git
 
 # Navigate to the project directory
 cd DevDocs
+# Configure environment variables
+# Copy the template file to .env
+copy .env.template .env
+# Ensure NEXT_PUBLIC_BACKEND_URL in .env is set correctly (e.g., http://localhost:24125)
+# This allows the frontend (running in your browser) to communicate with the backend service.
+
+# Prerequisites: Install WSL 2 and Docker Desktop
+# Docker Desktop for Windows requires WSL 2. Please ensure you have WSL 2 installed and running first.
+# 1. Install WSL 2: Follow the official Microsoft guide: https://learn.microsoft.com/en-us/windows/wsl/install
+# 2. Install Docker Desktop for Windows: Download and install from the official Docker website. Docker Desktop includes Docker Compose.
+
+
 
 # Start all services using Docker
 docker-start.bat

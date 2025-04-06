@@ -7,7 +7,7 @@ import JobStatsSummary from '@/components/JobStatsSummary' // Import the new sta
 import SubdomainList from '@/components/SubdomainList'
 import StoredFiles from '@/components/StoredFiles'
 import ConfigSettings from '@/components/ConfigSettings'
-import CrawlStatusMonitor from '@/components/CrawlStatusMonitor' // Import the new component
+import CrawlStatusMonitor from '@/components/CrawlStatusMonitor'
 import { discoverSubdomains, crawlPages, validateUrl, formatBytes } from '@/lib/crawl-service'
 import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
@@ -340,12 +340,18 @@ const handleCrawlSelectedClick = async () => {
         {/* Render CrawlStatusMonitor and pass the currentJobId */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
            <h2 className="text-2xl font-semibold mb-4 text-green-400">Discovered Pages</h2>
+           {/* Log jobStatus before passing to monitor */}
+           {(() => {
+             if (jobStatus) {
+               console.log("page.tsx: Passing jobStatus to CrawlStatusMonitor:", JSON.stringify(jobStatus));
+             }
+             return null; // Return null to render nothing
+           })()}
            <CrawlStatusMonitor
              jobId={currentJobId}
              status={jobStatus}
              error={jobError}
              isLoading={isPollingLoading}
-             // Pass down lifted state and handlers
              selectedUrls={selectedUrls}
              isCrawlingSelected={isCrawlingSelected}
              onSelectionChange={handleSelectionChange}
@@ -354,6 +360,11 @@ const handleCrawlSelectedClick = async () => {
         </div>
 
         {/* Keep SubdomainList for now, but it might be replaced by CrawlStatusMonitor's display */}
+        {/* Log if legacy SubdomainList condition is met */}
+        {(() => {
+          console.log(`page.tsx: discoveredPages.length = ${discoveredPages.length}. Rendering legacy SubdomainList? ${discoveredPages.length > 0}`);
+          return null; // Return null to render nothing
+        })()}
         {discoveredPages.length > 0 && (
           <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
             <h2 className="text-2xl font-semibold mb-4 text-cyan-400">Discovered Pages (Legacy Display)</h2>
@@ -368,11 +379,7 @@ const handleCrawlSelectedClick = async () => {
 
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
           {/* Render ConsolidatedFiles conditionally */}
-          <ConsolidatedFiles
-            jobId={currentJobId}
-            rootUrl={url} // Pass the original submitted URL as rootUrl
-            jobStatus={jobStatus?.overall_status ?? null}
-          />
+          <ConsolidatedFiles />
         </div>
         
         {/* Config and Settings popup with MCP Server and Discovered Pages */}
