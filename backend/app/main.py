@@ -1,19 +1,17 @@
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Path as FastApiPath
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, Field, validator # Removed Dict import
-from typing import List, Optional, Dict # Import Dict from typing if needed elsewhere, or just use dict
+from pydantic import BaseModel, Field, validator
+from typing import List
 import uvicorn
 import logging
 import psutil
 import os
 import requests
 import json
-import uuid
 import asyncio
 from pathlib import Path
 from datetime import datetime
-from .crawler import discover_pages, crawl_pages, DiscoveredPage, CrawlResult, url_to_filename
+from .crawler import discover_pages, crawl_pages, DiscoveredPage, CrawlResult, url_to_filename, in_memory_files, is_individual_file
 
 # Configure logging
 logging.basicConfig(
@@ -21,18 +19,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-app = FastAPI(title="Crawl4AI Backend")
 
-# Import status management
-from .status_manager import (
-    CrawlJobStatus,
-    initialize_job,
-    update_overall_status,
-    update_url_status, # We might need this later in crawler.py
-    add_pending_crawl_urls,
-    get_job_status
-)
-# Removed redundant app assignment
+app = FastAPI(title="Crawl4AI Backend")
 
 # Configure CORS to allow requests from our frontend
 app.add_middleware(
@@ -60,7 +48,6 @@ class DiscoverRequest(BaseModel):
         return v
 
 class CrawlRequest(BaseModel):
-    job_id: str # Add job_id to link crawl request to discovery job
     pages: List[DiscoveredPage]
 
 class MCPStatusResponse(BaseModel):
@@ -390,55 +377,86 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
             "status": "error",
             "error": f"Error testing Crawl4AI: {str(e)}"
         }
-# Removed /api/memory-files and /api/memory-files/{file_id} endpoints
 
-STORAGE_DIR = Path("storage/markdown")
-
-@app.get("/api/storage/file-content")
-async def get_storage_file_content(file_path: str = Query(..., description="Relative path to the file within storage/markdown")):
-    """Reads and returns the content of a file from the storage/markdown directory."""
+@app.get("/api/memory-files")
+async def list_memory_files():
+    """List all files stored in memory"""
     try:
-        # Security: Prevent directory traversal by ensuring file_path is just a filename
-        base_path = STORAGE_DIR.resolve()
-        safe_file_name = file_path.strip() # Remove leading/trailing whitespace
-
-        # Disallow any path separators or '..' components in the requested name
-        if "/" in safe_file_name or "\\" in safe_file_name or ".." in safe_file_name:
-            logger.warning(f"Attempted directory traversal (invalid characters/components): {file_path}")
-            raise HTTPException(status_code=400, detail="Invalid file path")
-
-        # Construct the full path safely
-        requested_path = base_path / safe_file_name
-
-        # Optional: Double-check that the final resolved path is still within the base directory
-        # This helps protect against more complex attacks like symlink issues if resolve() is used,
-        # but the primary defense here is disallowing path components in the input.
-        try:
-            if not requested_path.resolve().is_relative_to(base_path):
-                 logger.warning(f"Attempted directory traversal (resolved outside base): {file_path} -> {requested_path.resolve()}")
-                 raise HTTPException(status_code=400, detail="Invalid file path location")
-        except Exception as resolve_err: # Catch potential errors during resolve
-            logger.warning(f"Error resolving path {requested_path}: {resolve_err}")
-            raise HTTPException(status_code=400, detail="Invalid file path format")
-
-        if not requested_path.is_file():
-            logger.warning(f"Requested storage file not found: {requested_path}")
-            raise HTTPException(status_code=404, detail=f"File not found at path: {requested_path}") # More specific detail
-
-        logger.info(f"Attempting to read storage file: {requested_path}") # Log before read
-        content = requested_path.read_text(encoding='utf-8')
-        logger.info(f"Successfully read {len(content)} bytes from storage file: {requested_path}") # Log after successful read
-        # Return as plain text, assuming frontend handles markdown rendering
-        return PlainTextResponse(content=content)
-
-    except HTTPException as http_exc:
-        # Re-raise HTTPExceptions directly
-        raise http_exc
+        logger.info("Listing in-memory files")
+        
+        # Convert the in-memory files to a list of file details
+        file_details = []
+        for filename, file_data in in_memory_files.items():
+            # Extract the file ID (without extension)
+            file_id = os.path.basename(filename)
+            if file_id.endswith('.md'):
+                file_id = file_id[:-3]
+            elif file_id.endswith('.json'):
+                file_id = file_id[:-5]
+                
+            # Get the content and metadata
+            content = file_data.get('content', '')
+            metadata = file_data.get('metadata', {})
+            timestamp = file_data.get('timestamp', datetime.now().isoformat())
+            
+            # Check if this is a JSON file
+            is_json = filename.endswith('.json')
+            
+            # Add the file details
+            file_details.append({
+                'name': file_id,
+                'path': filename,
+                'timestamp': timestamp,
+                'size': len(content),
+                'wordCount': len(content.split()) if not is_json else 0,
+                'charCount': len(content),
+                'isInMemory': True,
+                'isJson': is_json,
+                'metadata': metadata
+            })
+        
+        logger.info(f"Found {len(file_details)} in-memory files")
+        return {
+            'success': True,
+            'files': file_details
+        }
     except Exception as e:
-        # Log the specific error *before* raising the generic 500
-        logger.error(f"Caught exception reading storage file {requested_path} (original request: {file_path}): {type(e).__name__} - {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
-# Removed stray brace
+        logger.error(f"Error listing in-memory files: {str(e)}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e),
+            'files': []
+        }
+
+@app.get("/api/memory-files/{file_id}")
+async def get_memory_file(file_id: str):
+    """Get the content of a file stored in memory"""
+    try:
+        logger.info(f"Retrieving in-memory file: {file_id}")
+        
+        # Check if the file exists in memory
+        for filename, file_data in in_memory_files.items():
+            if filename.endswith(file_id) or os.path.basename(filename).startswith(file_id):
+                content = file_data.get('content', '')
+                logger.info(f"Found in-memory file: {filename}")
+                return {
+                    'success': True,
+                    'content': content,
+                    'metadata': file_data.get('metadata', {})
+                }
+        
+        # If we get here, the file wasn't found
+        logger.warning(f"In-memory file not found: {file_id}")
+        return {
+            'success': False,
+            'error': f"File not found: {file_id}"
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving in-memory file: {str(e)}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 @app.get("/api/mcp/logs", response_model=MCPLogsResponse)
 async def get_mcp_logs():
@@ -461,84 +479,153 @@ async def get_mcp_logs():
         return {"logs": [f"Error reading logs: {str(e)}"]}
 
 @app.post("/api/discover")
-async def discover_endpoint(request: DiscoverRequest, background_tasks: BackgroundTasks):
-    """Initiates page discovery for the provided URL and returns a job ID."""
+async def discover_endpoint(request: DiscoverRequest):
+    """Discover pages related to the provided URL"""
     try:
-        job_id = str(uuid.uuid4())
+        logger.info(f"Received discover request for URL: {request.url} with depth: {request.depth}")
+        
+        # Log environment variables for debugging
+        logger.info(f"CRAWL4AI_URL: {os.environ.get('CRAWL4AI_URL', 'Not set')}")
+        logger.info(f"CRAWL4AI_API_TOKEN: {'Set' if os.environ.get('CRAWL4AI_API_TOKEN') else 'Not set'}")
+        
+        # Check if Crawl4AI service is reachable
+        try:
+            crawl4ai_url = os.environ.get("CRAWL4AI_URL", "http://crawl4ai:11235")
+            logger.info(f"Testing connection to Crawl4AI service at {crawl4ai_url}")
+            
+            # Try to ping the Crawl4AI service
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2)
+            crawl4ai_host = crawl4ai_url.split('//')[1].split(':')[0]
+            crawl4ai_port = int(crawl4ai_url.split(':')[-1])
+            logger.info(f"Attempting to connect to {crawl4ai_host}:{crawl4ai_port}")
+            result = s.connect_ex((crawl4ai_host, crawl4ai_port))
+            s.close()
+            
+            if result == 0:
+                logger.info(f"Successfully connected to Crawl4AI service at {crawl4ai_host}:{crawl4ai_port}")
+            else:
+                logger.error(f"Could not connect to Crawl4AI service at {crawl4ai_host}:{crawl4ai_port}, error code: {result}")
+                # Continue anyway, as the discover_pages function will handle connection errors
+        except Exception as conn_error:
+            logger.error(f"Error checking Crawl4AI service connection: {str(conn_error)}")
+            # Continue anyway, as the discover_pages function will handle connection errors
+        
+        # The root URL is the URL provided in the request
         root_url = request.url
-        logger.info(f"Received discover request for URL: {root_url} with depth: {request.depth}. Assigning job ID: {job_id}")
-
-        # Initialize job status using the manager
-        initialize_job(job_id=job_id, root_url=root_url)
-
-        # Run discovery in the background
-        # Pass crawl_jobs dictionary to the background task if direct import causes issues
-        background_tasks.add_task(discover_pages, url=root_url, max_depth=request.depth, root_url=root_url, job_id=job_id)
-
-        logger.info(f"Discovery initiated in background for job ID: {job_id}")
-        # Return job ID immediately
-        return {
-            "message": "Discovery initiated",
-            "job_id": job_id,
+        logger.info(f"Using root URL for consolidated files: {root_url}")
+        
+        # Call discover_pages with detailed logging
+        logger.info(f"Calling discover_pages with URL: {request.url}, depth: {request.depth}, root_url: {root_url}")
+        pages = await discover_pages(request.url, max_depth=request.depth, root_url=root_url)
+        
+        # Log the results
+        if pages:
+            logger.info(f"Successfully discovered {len(pages)} pages")
+            for i, page in enumerate(pages[:5]):  # Log first 5 pages to avoid excessive logging
+                logger.info(f"Discovered page {i+1}: {page.url} ({page.status})")
+                if page.internalLinks:
+                    logger.info(f"  Page {i+1} has {len(page.internalLinks)} internal links")
+            if len(pages) > 5:
+                logger.info(f"... and {len(pages) - 5} more pages")
+        else:
+            logger.warning("No pages discovered - this might indicate an issue with the crawler")
+            
+        # Always return a valid response, even if no pages were found
+        response_data = {
+            "pages": pages or [],  # Ensure we always return an array
+            "message": f"Found {len(pages)} pages" if pages else "No pages discovered",
             "success": True
         }
         logger.info(f"Returning response with {len(response_data['pages'])} pages")
         return response_data
     except Exception as e:
-        logger.error(f"Error initiating discovery for {request.url}: {str(e)}", exc_info=True)
-        # Return a structured error response immediately if initiation fails
-        # Note: Background task errors need separate handling within the task itself.
-        raise HTTPException(status_code=500, detail=f"Error initiating discovery: {str(e)}")
+        logger.error(f"Error discovering pages: {str(e)}", exc_info=True)
+        
+        # Log more detailed error information
+        if isinstance(e, requests.exceptions.RequestException):
+            logger.error(f"Request exception details: {str(e)}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response body: {e.response.text[:500]}")
+        
+        # Return a structured error response
+        error_response = {
+            "pages": [],
+            "message": f"Error discovering pages: {str(e)}",
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+        logger.info(f"Returning error response: {error_response}")
+        return error_response
+
 @app.post("/api/crawl")
-async def crawl_endpoint(request: CrawlRequest, background_tasks: BackgroundTasks):
-    """Initiates crawling for the provided pages list associated with a job ID."""
-    job_id = request.job_id
+async def crawl_endpoint(request: CrawlRequest):
+    """Crawl the provided pages and generate markdown content"""
     try:
-        logger.info(f"Received crawl request for job ID: {job_id} with {len(request.pages)} pages")
-
-        job_status = get_job_status(job_id)
-        if not job_status:
-            logger.error(f"Crawl request received for unknown job ID: {job_id}")
-            raise HTTPException(status_code=404, detail=f"Job ID {job_id} not found.")
-
-        # Update overall status and add pending URLs using the manager
-        update_overall_status(job_id=job_id, status='crawling')
-        add_pending_crawl_urls(job_id=job_id, urls=[page.url for page in request.pages])
-
-        # Determine root_url for file naming from the job status
-        root_url = job_status.root_url
-        if not root_url and request.pages:
-             root_url = request.pages[0].url # Fallback if original root not found (shouldn't happen ideally)
-        logger.info(f"Using root URL for consolidated files: {root_url} for job {job_id}")
-
-        # Run crawling in the background
-        # Pass crawl_jobs dictionary to the background task if direct import causes issues
-        background_tasks.add_task(crawl_pages, pages=request.pages, root_url=root_url, job_id=job_id)
-
-        logger.info(f"Crawling initiated in background for job ID: {job_id}")
-        # Return acknowledgment immediately
+        logger.info(f"Received crawl request for {len(request.pages)} pages")
+        
+        # Use the first page's URL as the root URL for consolidated file naming
+        root_url = request.pages[0].url if request.pages else None
+        logger.info(f"Using root URL for consolidated files: {root_url}")
+        
+        # Generate a consistent file ID based on the root URL
+        if root_url:
+            file_id = url_to_filename(root_url)
+            logger.info(f"Generated file ID for consolidated content: {file_id}")
+        else:
+            file_id = None
+            logger.warning("No root URL provided, consolidated file will not be created")
+        
+        result = await crawl_pages(request.pages, root_url=root_url)
+        
+        # Log the results
+        logger.info(f"Successfully crawled pages. Stats: {result.stats}")
+        
+        # Add information about the consolidated file to the response
+        consolidated_info = None
+        if file_id:
+            storage_file = f"storage/markdown/{file_id}.md"
+            metadata_file = f"storage/markdown/{file_id}.json"
+            
+            if os.path.exists(storage_file) and os.path.exists(metadata_file):
+                try:
+                    with open(metadata_file, 'r') as f:
+                        metadata = json.load(f)
+                    
+                    consolidated_info = {
+                        "file_id": file_id,
+                        "markdown_path": storage_file,
+                        "metadata_path": metadata_file,
+                        "pages_count": len(metadata.get("pages", [])),
+                        "last_updated": metadata.get("last_updated")
+                    }
+                    logger.info(f"Consolidated file info: {consolidated_info}")
+                except Exception as e:
+                    logger.error(f"Error reading consolidated file metadata: {str(e)}")
+        
         return {
-            "message": "Crawling initiated",
-            "job_id": job_id,
-            "success": True
+            "markdown": result.markdown,
+            "stats": result.stats.dict(),
+            "success": True,
+            "consolidated_file": consolidated_info
         }
     except Exception as e:
-        logger.error(f"Error initiating crawl for job ID {job_id}: {str(e)}", exc_info=True)
-        # Update job status using the manager
-        update_overall_status(job_id=job_id, status='error', error_message=f"Error initiating crawl: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error initiating crawl: {str(e)}")
-
-
-@app.get("/api/crawl-status/{job_id}", response_model=CrawlJobStatus)
-async def get_crawl_status(job_id: str = FastApiPath(..., title="Job ID", description="The unique ID of the crawl job")):
-    """Retrieves the current status of a crawl job."""
-    logger.debug(f"Received status request for job ID: {job_id}")
-    job_status = get_job_status(job_id)
-    if not job_status:
-        logger.warning(f"Status requested for unknown job ID: {job_id}")
-        raise HTTPException(status_code=404, detail=f"Job ID {job_id} not found.")
-    logger.debug(f"Returning status for job ID {job_id}: {job_status.overall_status}")
-    return job_status
+        logger.error(f"Error crawling pages: {str(e)}", exc_info=True)
+        # Return a structured error response
+        return {
+            "markdown": "",
+            "stats": {
+                "subdomains_parsed": 0,
+                "pages_crawled": 0,
+                "data_extracted": "0 KB",
+                "errors_encountered": 1
+            },
+            "success": False,
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     uvicorn.run(

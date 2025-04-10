@@ -1,6 +1,5 @@
 # Base Node.js image
 FROM node:20-alpine
-ARG NEXT_PUBLIC_BACKEND_URL
 
 WORKDIR /app
 
@@ -22,7 +21,6 @@ COPY . .
 RUN mkdir -p public
 
 # Next.js build
-ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 RUN npm run build
 
 EXPOSE 3001

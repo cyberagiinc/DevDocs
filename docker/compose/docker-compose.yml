@@ -3,13 +3,12 @@ services:
     build:
       context: .
       dockerfile: docker/dockerfiles/Dockerfile.frontend
-      args:
-        - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL} # Pass the variable as a build arg
     container_name: devdocs-frontend
     ports:
       - "3001:3001"
     environment:
-      # - NEXT_PUBLIC_BACKEND_URL=http://backend:24125
+      - BACKEND_URL=http://backend:24125
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:24125
       - MCP_HOST=mcp
     depends_on:
       - backend

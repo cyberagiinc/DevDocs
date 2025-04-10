@@ -7,11 +7,11 @@ import { Globe, Loader2, CheckCircle2, AlertCircle, Link as LinkIcon, ChevronDow
 
 interface SubdomainListProps {
   subdomains: DiscoveredPage[]
-  onCrawlSelected?: (selectedUrls: string[]) => void // Made optional
+  onCrawlSelected: (selectedUrls: string[]) => void
   isProcessing: boolean
 }
 
-export default function SubdomainList({ subdomains, /* onCrawlSelected, */ isProcessing }: SubdomainListProps) { // Commented out unused prop
+export default function SubdomainList({ subdomains, onCrawlSelected, isProcessing }: SubdomainListProps) {
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set())
 
@@ -135,7 +135,30 @@ export default function SubdomainList({ subdomains, /* onCrawlSelected, */ isPro
             )}
           </div>
         </div>
-        {/* Button removed as functionality moved to CrawlStatusMonitor */}
+        <Button
+          onClick={() => onCrawlSelected(Array.from(selectedPages))}
+          disabled={isProcessing || selectedPages.size === 0}
+          className={`
+            flex items-center gap-2 transition-all duration-300
+            ${isProcessing ? 'bg-purple-500/50' : 'bg-purple-500 hover:bg-purple-600'}
+          `}
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing...</span>
+            </>
+          ) : (
+            <>
+              <Globe className="w-4 h-4" />
+              <span>
+                {selectedPages.size === getTotalUrls()
+                  ? `Crawl All Pages (${getTotalUrls()})`
+                  : `Crawl Selected (${selectedPages.size}/${getTotalUrls()})`}
+              </span>
+            </>
+          )}
+        </Button>
       </div>
       
       {/* Table Container */}

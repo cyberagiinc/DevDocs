@@ -63,42 +63,46 @@ export default function StoredFiles() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleDownload = async (path: string, type: 'json' | 'markdown') => {
-    // Removed isInMemory check. All files are now fetched via the backend API reading from disk.
-    try {
-      // Fetch file content from the new backend API endpoint
-      // The 'path' argument should be the relative path within storage/markdown
-      const response = await fetch(`/api/storage/file-content?path=${encodeURIComponent(path)}`)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Failed to fetch file content for ${path}:`, response.status, errorText)
-        // TODO: Show user feedback (e.g., toast notification)
-        return
+  const handleDownload = async (path: string, type: 'json' | 'markdown', isInMemory?: boolean) => {
+    if (isInMemory) {
+      try {
+        // For in-memory files, we need to fetch the content from the backend API
+        const fileId = path.split('/').pop()?.replace(/\.(json|md)$/, '') || ''
+        const response = await fetch(`/api/memory-file?id=${encodeURIComponent(fileId)}`)
+        
+        if (!response.ok) {
+          console.error('Failed to fetch in-memory file:', response.statusText)
+          return
+        }
+        
+        const data = await response.json()
+        
+        if (!data.success || !data.content) {
+          console.error('Invalid response format or empty content')
+          return
+        }
+        
+        // Create a blob and download it
+        const blob = new Blob([data.content], { type: type === 'json' ? 'application/json' : 'text/markdown' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = path.split('/').pop() || `content.${type === 'json' ? 'json' : 'md'}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch (error) {
+        console.error('Error downloading in-memory file:', error)
       }
-
-      // Get the content as text
-      const content = await response.text()
-
-      if (!content) {
-        console.error('Received empty content for file:', path)
-        // TODO: Show user feedback
-        return
-      }
-
-      // Create a blob and download it
-      const blob = new Blob([content], { type: type === 'json' ? 'application/json' : 'text/markdown' })
-      const url = URL.createObjectURL(blob)
+    } else {
+      // For disk files, use the existing download API
       const a = document.createElement('a')
-      a.href = url
+      a.href = `/api/storage/download?path=${encodeURIComponent(path)}`
       a.download = path.split('/').pop() || `content.${type === 'json' ? 'json' : 'md'}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error(`Error downloading file ${path}:`, error)
-      // TODO: Show user feedback
     }
   }
 
@@ -238,7 +242,7 @@ export default function StoredFiles() {
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-3">
                     <Button
-                      onClick={() => handleDownload(file.jsonPath, 'json')}
+                      onClick={() => handleDownload(file.jsonPath, 'json', file.isInMemory)}
                       variant="outline"
                       size="icon"
                       title="Download as JSON data"
@@ -247,7 +251,7 @@ export default function StoredFiles() {
                       <DataObjectIcon className="w-4 h-4 text-yellow-400" />
                     </Button>
                     <Button
-                      onClick={() => handleDownload(file.markdownPath, 'markdown')}
+                      onClick={() => handleDownload(file.markdownPath, 'markdown', file.isInMemory)}
                       variant="outline"
                       size="icon"
                       title={file.isConsolidated ? "Download Consolidated Markdown" : "Download Markdown"}
