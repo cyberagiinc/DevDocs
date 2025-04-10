@@ -1,8 +1,8 @@
 # DevDocs by CyberAGI 🚀
 
 <div align="center">
-  <img src="assets/image.png" alt="DevDocs Interface" width="800">
-
+  <img src="https://github.com/user-attachments/assets/6d4cc4df-fe5d-4483-9218-3d621f572e49" alt="DevDocs Interface" width="800">
+  <img src="https://github.com/user-attachments/assets/00350dc6-2ff3-40cf-b0b3-8b3e387d983d" alt="DevDocs Interface" width="800">
 
   <p align="center">
     <strong>Turn Weeks of Documentation Research into Hours of Productive Development</strong>
@@ -108,42 +108,17 @@ git clone https://github.com/cyberagiinc/DevDocs.git
 # Navigate to the project directory
 cd DevDocs
 
-# Configure environment variables
-# Copy the template file to .env
-cp .env.template .env
-
-# Ensure NEXT_PUBLIC_BACKEND_URL in .env is set correctly (e.g., http://localhost:24125)
-# This allows the frontend (running in your browser) to communicate with the backend service.
-
-
 # Start all services using Docker
 ./docker-start.sh
 ```
 
-For Windows users: Experimental Only (Not Tested Yet)
+For Windows users:
 ```cmd
 # Clone the repository
 git clone https://github.com/cyberagiinc/DevDocs.git
 
 # Navigate to the project directory
-
 cd DevDocs
-
-# Configure environment variables
-# Copy the template file to .env
-
-copy .env.template .env
-
-# Ensure NEXT_PUBLIC_BACKEND_URL in .env is set correctly (e.g., http://localhost:24125)
-
-# This allows the frontend (running in your browser) to communicate with the backend service.
-
-# Prerequisites: Install WSL 2 and Docker Desktop
-# Docker Desktop for Windows requires WSL 2. Please ensure you have WSL 2 installed and running first.
-# 1. Install WSL 2: Follow the official Microsoft guide: https://learn.microsoft.com/en-us/windows/wsl/install
-# 2. Install Docker Desktop for Windows: Download and install from the official Docker website. Docker Desktop includes Docker Compose.
-
-
 
 # Start all services using Docker
 docker-start.bat

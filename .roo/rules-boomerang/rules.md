@@ -1,3 +1,0 @@
-Special Rules for Critiquing plans and strategies:
-
-Once you have created a subtask markdown file or in memory, you are to get a second opinion from the mode called "Expert Opinion" This mode is designed to only accept your subtask plans and strategies before you present it to the user to approve. You are to do this before you deligate to either Code or Debug modes and after you have created a subtask. Consider this mode as your personal brainstorm. Argue with it from ground truth about the codebase, both you and the Expert Opinion mode as complete knowledge of the codebase. I want you to counter the points and come to a common understanding for the most accurate and right path moving forward and then present those findings to the user. 
