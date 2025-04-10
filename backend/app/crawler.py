@@ -175,7 +175,7 @@ async def discover_pages(
     try:
         # Update status for the current URL being discovered
         if job_id:
-            update_url_status(job_id, url, 'discovering')
+            update_url_status(job_id, normalize_url(url), 'discovering')
 
         # --- Start: Re-added crawl4ai call for link discovery ONLY ---
         logger.info(f"Requesting link discovery for {url} from Crawl4AI (Job ID: {job_id})")
@@ -214,13 +214,13 @@ async def discover_pages(
                     logger.info(f"Link discovery task {task_id} for {url} completed successfully (Job ID: {job_id})")
                     # Mark URL as pending crawl, ready for the next phase
                     if job_id:
-                        update_url_status(job_id, url, 'pending_crawl')
+                        update_url_status(job_id, normalize_url(url), 'pending_crawl')
                     break # Exit polling loop on completion
                 elif status["status"] == "failed":
                     error_msg = status.get('error', 'Unknown error')
                     logger.error(f"Link discovery task {task_id} for {url} failed: {error_msg} (Job ID: {job_id})")
                     if job_id:
-                        update_url_status(job_id, url, 'discovery_error')
+                        update_url_status(job_id, normalize_url(url), 'discovery_error')
                     result = None # Ensure result is None on failure
                     break # Exit polling loop on failure
                 # Continue polling if status is 'running' or other non-terminal state
@@ -228,17 +228,17 @@ async def discover_pages(
             if result is None and status["status"] != "failed": # Check if loop finished without success or explicit failure
                  logger.warning(f"Timeout waiting for link discovery result for {url} (Task ID: {task_id}, Job ID: {job_id})")
                  if job_id:
-                     update_url_status(job_id, url, 'discovery_error') # Mark as error on timeout
+                     update_url_status(job_id, normalize_url(url), 'discovery_error') # Mark as error on timeout
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed during link discovery for {url}: {str(e)}", exc_info=True)
             if job_id:
-                update_url_status(job_id, url, 'discovery_error')
+                update_url_status(job_id, normalize_url(url), 'discovery_error')
             result = None # Ensure result is None on request error
         except Exception as e:
             logger.error(f"Unexpected error during link discovery for {url}: {str(e)}", exc_info=True)
             if job_id:
-                update_url_status(job_id, url, 'discovery_error')
+                update_url_status(job_id, normalize_url(url), 'discovery_error')
             result = None # Ensure result is None on other errors
         # --- End: Re-added crawl4ai call for link discovery ONLY ---
 
@@ -333,7 +333,7 @@ async def discover_pages(
         logger.error(error_message, exc_info=True)
         if job_id:
             # Mark current URL as error
-            update_url_status(job_id, url, 'discovery_error')
+            update_url_status(job_id, normalize_url(url), 'discovery_error')
             # Mark overall job as error only if it's the root call failing
             if current_depth == 1:
                  update_overall_status(job_id, 'error', error_message)
@@ -377,7 +377,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
             try:
                 logger.info(f"Crawling page: {page.url} (Job ID: {job_id})")
                 if job_id:
-                    update_url_status(job_id, page.url, 'crawling')
+                    update_url_status(job_id, normalize_url(page.url), 'crawling')
                 
                 # No longer replacing docs.crawl4ai.com URLs
                 url = page.url
@@ -431,7 +431,10 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                         if status["status"] == "completed":
                             result = status["result"]
                             logger.info(f"Content crawl task {task_id} for {url} completed successfully (Job ID: {job_id})")
-                            # Status updated later based on content extraction
+                            # Update status immediately upon successful task completion
+                            if job_id:
+                                update_url_status(job_id, normalize_url(url), 'completed')
+                            # Content processing and saving follows
                             
                             # Save the result to files
                             try:
@@ -549,7 +552,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                             error_msg = status.get('error', 'Unknown error')
                             logger.error(f"Content crawl task {task_id} for {url} failed: {error_msg} (Job ID: {job_id})")
                             if job_id:
-                                update_url_status(job_id, url, 'crawl_error')
+                                update_url_status(job_id, normalize_url(url), 'crawl_error')
                             break
                         elif status["status"] == "running":
                             logger.info(f"Task {task_id} is still running")
@@ -562,7 +565,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                 if not result:
                     logger.warning(f"Timeout waiting for content crawl result for {url} after {max_attempts} attempts (Job ID: {job_id})")
                     if job_id:
-                        update_url_status(job_id, url, 'crawl_error') # Mark as error on timeout
+                        update_url_status(job_id, normalize_url(url), 'crawl_error') # Mark as error on timeout
                     errors += 1
                     page.status = "error"
                     continue
@@ -602,23 +605,23 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                         total_size += len(page_markdown.encode('utf-8'))
                         logger.info(f"Successfully extracted content from {url} (Job ID: {job_id})")
                         if job_id:
-                            update_url_status(job_id, url, 'completed')
+                            # Status already updated when task completed successfully
                         
-                        # Mark URL as crawled
-                        crawled_urls.add(page.url)
-                        page.status = "crawled"
+                            # Mark URL as crawled
+                            crawled_urls.add(page.url)
+                            page.status = "crawled"
                     else:
                         logger.warning(f"Skipping {url} - filtered content was empty (Job ID: {job_id})")
                         errors += 1
                         page.status = "error" # Keep local status for stats
                         if job_id:
-                            update_url_status(job_id, url, 'crawl_error') # Mark as error in global status
+                            update_url_status(job_id, normalize_url(url), 'crawl_error') # Mark as error in global status
                 else:
                     logger.warning(f"Skipping {url} - no markdown content available (Job ID: {job_id})")
                     errors += 1
                     page.status = "error" # Keep local status for stats
                     if job_id:
-                        update_url_status(job_id, url, 'crawl_error') # Mark as error in global status
+                        update_url_status(job_id, normalize_url(url), 'crawl_error') # Mark as error in global status
                     
             except Exception as e:
                 error_message = f"Error crawling page {page.url}: {str(e)}"
@@ -626,7 +629,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                 errors += 1
                 page.status = "error" # Keep local status for stats
                 if job_id:
-                    update_url_status(job_id, page.url, 'crawl_error') # Mark as error in global status
+                    update_url_status(job_id, normalize_url(page.url), 'crawl_error') # Mark as error in global status
         
         combined_markdown = "".join(all_markdown)
         

@@ -7,11 +7,22 @@ import JobStatsSummary from '@/components/JobStatsSummary' // Import the new sta
 import SubdomainList from '@/components/SubdomainList'
 import StoredFiles from '@/components/StoredFiles'
 import ConfigSettings from '@/components/ConfigSettings'
-import CrawlStatusMonitor from '@/components/CrawlStatusMonitor'
+import CrawlStatusMonitor from '@/components/CrawlStatusMonitor';
+import CrawlUrls from '@/components/CrawlUrls'; // Import the new component
+import { Button } from "@/components/ui/button"; // Import Button
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"; // Import Dialog components
+import { Info } from 'lucide-react'; // Import an icon for the trigger
 import { discoverSubdomains, crawlPages, validateUrl, formatBytes } from '@/lib/crawl-service'
 import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
-import { DiscoveredPage, CrawlJobStatus, OverallStatus } from '@/lib/types' // Import status types
+import { DiscoveredPage, CrawlJobStatus, OverallStatus, UrlStatus } from '@/lib/types' // Import status types & UrlStatus
 import ConsolidatedFiles from '@/components/ConsolidatedFiles' // Import ConsolidatedFiles
 
 export default function Home() {
@@ -111,6 +122,11 @@ const handleSelectionChange = (newSelectedUrls: Set<string>) => {
   setSelectedUrls(newSelectedUrls);
 };
 
+// Handler for status updates from the polling logic
+const handleStatusUpdate = (newStatus: CrawlJobStatus) => {
+  setJobStatus(newStatus);
+};
+
 // Renamed and refactored handler for the "Crawl Selected" button click
 const handleCrawlSelectedClick = async () => {
   // Removed erroneous inner function declaration
@@ -157,6 +173,8 @@ const handleCrawlSelectedClick = async () => {
         title: "Crawl Request Sent",
         description: `Backend acknowledged crawl request for job ${crawlResponse.jobId}. Monitor progress below.`
       })
+      // Clear selection after initiating crawl
+      setSelectedUrls(new Set());
 
       // Clear local markdown state?
       setMarkdown('')
@@ -270,6 +288,8 @@ const handleCrawlSelectedClick = async () => {
           }
         } else {
           console.log(`(Page) Status received for job ${currentJobId}:`, data.overall_status);
+          // Log full status object for debugging icon updates
+          console.log(`(Page) Full status data for job ${currentJobId}:`, JSON.stringify(data, null, 2));
           setJobStatus(data);
           setJobError(null); // Clear previous errors on success
 
@@ -316,7 +336,7 @@ const handleCrawlSelectedClick = async () => {
       <header className="w-full py-12 bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-4">
-            DevDocs
+            DevDocs by CyberAGI Inc
           </h1>
           <p className="text-gray-300 text-lg max-w-2xl mx-auto">
             Discover and extract documentation for quicker development
@@ -337,27 +357,50 @@ const handleCrawlSelectedClick = async () => {
           <UrlInput onSubmit={handleSubmit} />
         </div>
 
-        {/* Render CrawlStatusMonitor and pass the currentJobId */}
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
-           <h2 className="text-2xl font-semibold mb-4 text-green-400">Discovered Pages</h2>
-           {/* Log jobStatus before passing to monitor */}
-           {(() => {
-             if (jobStatus) {
-               console.log("page.tsx: Passing jobStatus to CrawlStatusMonitor:", JSON.stringify(jobStatus));
-             }
-             return null; // Return null to render nothing
-           })()}
-           <CrawlStatusMonitor
-             jobId={currentJobId}
-             status={jobStatus}
-             error={jobError}
-             isLoading={isPollingLoading}
-             selectedUrls={selectedUrls}
-             isCrawlingSelected={isCrawlingSelected}
-             onSelectionChange={handleSelectionChange}
-             onCrawlSelected={handleCrawlSelectedClick}
-           />
-        </div>
+        {/* Render the new CrawlUrls component and the Dialog trigger */}
+        {currentJobId && ( // Only render if there's an active job
+          <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold text-cyan-400">Crawl Queue</h2>
+              {/* Dialog Trigger Button */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" className="bg-white text-black hover:bg-gray-100 hover:text-black">
+                    <Info className="h-4 w-4" />
+                    <span className="sr-only">View Overall Job Status</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[625px] bg-gray-900 border-gray-700 text-gray-300">
+                  <DialogHeader>
+                    <DialogTitle className="text-green-400">Overall Job Status</DialogTitle>
+                    <DialogDescription>
+                      Detailed status for Job ID: {currentJobId}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {/* Render CrawlStatusMonitor inside the Dialog */}
+                  <CrawlStatusMonitor
+                    jobId={currentJobId}
+                    status={jobStatus}
+                    error={jobError}
+                    isLoading={isPollingLoading}
+                    onStatusUpdate={handleStatusUpdate} // Keep this handler
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+            {/* CrawlUrls Component */}
+            <CrawlUrls
+              jobId={currentJobId}
+              urls={jobStatus?.urls || {}}
+              selectedUrls={selectedUrls}
+              onSelectionChange={handleSelectionChange}
+              onCrawlSelected={handleCrawlSelectedClick}
+              isCrawlingSelected={isCrawlingSelected}
+            />
+          </div>
+        )}
+
+        {/* Removed the separate temporary container for CrawlStatusMonitor */}
 
         {/* Keep SubdomainList for now, but it might be replaced by CrawlStatusMonitor's display */}
         {/* Log if legacy SubdomainList condition is met */}

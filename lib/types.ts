@@ -91,3 +91,13 @@ export interface CrawlResponse {
   error?: string; // Include optional error message
   // message?: string; // Backend currently returns message
 }
+
+// --- Props for CrawlUrls Component ---
+export interface CrawlUrlsProps {
+  urls: Record<string, UrlStatus>; // Use existing UrlStatus type
+  selectedUrls: Set<string>;
+  onSelectionChange: (newSelectedUrls: Set<string>) => void;
+  onCrawlSelected: () => void;
+  isCrawlingSelected: boolean;
+  jobId: string | null;
+}

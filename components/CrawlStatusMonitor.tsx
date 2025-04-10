@@ -1,7 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // Added useRef
 import { CrawlJobStatus, OverallStatus, UrlStatus, DiscoveredPage } from '@/lib/types'; // Import necessary types & DiscoveredPage
+interface CrawlStatusMonitorProps {
+  jobId: string | null;
+}
+
 import { Button } from '@/components/ui/button'; // Import Button
 import { crawlPages } from '@/lib/crawl-service'; // Import crawlPages service
 import { useToast } from '@/components/ui/use-toast'; // Import useToast
@@ -16,10 +20,7 @@ interface CrawlStatusMonitorProps {
   error: string | null;         // Receive error as prop
   isLoading: boolean;           // Receive loading state as prop
   // Add props for lifted state and handlers
-  selectedUrls: Set<string>;
-  isCrawlingSelected: boolean;
-  onSelectionChange: (newSelectedUrls: Set<string>) => void;
-  onCrawlSelected: () => void; // Keep it simple, parent handles async/toast
+  onStatusUpdate: (status: CrawlJobStatus) => void; // Keep status updates
 }
 
 const CrawlStatusMonitor: React.FC<CrawlStatusMonitorProps> = ({
@@ -28,46 +29,23 @@ const CrawlStatusMonitor: React.FC<CrawlStatusMonitorProps> = ({
   error,     // Destructure props
   isLoading, // Destructure props
   // Destructure new props
-  selectedUrls,
-  isCrawlingSelected,
-  onSelectionChange,
-  onCrawlSelected,
+  onStatusUpdate, // Keep status updates
 }) => {
-  // Keep internal state for the 'Select All' checkbox UI only
-  const [isSelectAllChecked, setIsSelectAllChecked] = useState<boolean>(false);
+  // Removed internal state related to selection
   // Toast can remain here if needed for local feedback, or be handled entirely by parent
   const { toast } = useToast();
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null); // Ref to store interval ID
 
-  // --- Moved Hooks and Derived State Calculations Before Early Returns ---
-  // Memoize the list of URLs eligible for crawling (pending_crawl status)
-  const crawlableUrls = useMemo(() => {
-    // Add more defensive checks for status and status.urls
-    if (!status || typeof status !== 'object' || !status.urls || typeof status.urls !== 'object' || status.overall_status !== 'discovery_complete') {
-      return [];
-    }
-    try {
-      // Now it should be safer to call Object.entries
-      return Object.entries(status.urls)
-        .filter(([_, urlStatus]) => urlStatus === 'pending_crawl')
-        .map(([url]) => url);
-    } catch (e) {
-       console.error("Error processing status.urls in crawlableUrls useMemo:", e, status.urls);
-       return []; // Return empty array on error
-    }
-  }, [status]); // Dependency is status prop
+  // --- Polling logic REMOVED ---
+  // Polling is now handled by the parent component (app/page.tsx)
+  // This useEffect and the one below (lines 140-165) caused the 404 errors.
 
-  // Calculate derived state (these are not hooks, just calculations)
-  const totalUrlCount = status?.urls ? Object.keys(status.urls).length : 0;
-  const selectedCount = selectedUrls.size; // Use prop
-  const canCrawl = status?.overall_status === 'discovery_complete';
-  // --- End Moved Section ---
+  // --- Redundant polling restart logic REMOVED ---
+  // This was also causing 404s as polling is handled by the parent.
+  // --- Removed Hooks and Derived State Calculations related to URL list ---
 
 
-  // Reset selection state effect (This hook is fine here as it doesn't affect render order)
-  useEffect(() => {
-      // Only reset internal UI state here. Parent resets selectedUrls/isCrawlingSelected.
-      setIsSelectAllChecked(false);
-  }, [jobId, status?.overall_status]); // Reset if job changes or status resets
+  // Removed effect related to selection state
 
   // Basic rendering logic (Step 4.4.4)
   if (!jobId) {
@@ -130,40 +108,7 @@ const CrawlStatusMonitor: React.FC<CrawlStatusMonitorProps> = ({
     }
   };
 
-  // --- Selection Logic Handlers ---
-  const handleCheckboxChange = (url: string) => {
-    // Calculate the new set based on the prop
-    const newSelectedUrls = new Set(selectedUrls);
-    if (newSelectedUrls.has(url)) {
-      newSelectedUrls.delete(url);
-    } else {
-      newSelectedUrls.add(url);
-    }
-
-    // Update internal Select All checkbox state
-    setIsSelectAllChecked(crawlableUrls.length > 0 && newSelectedUrls.size === crawlableUrls.length);
-
-    // Call the callback prop to update the parent state
-    onSelectionChange(newSelectedUrls);
-  };
-
-  const handleSelectAllChange = (isChecked: boolean) => {
-    setIsSelectAllChecked(isChecked); // Update internal UI state
-    let newSelectedUrls: Set<string>;
-    if (isChecked) {
-      // Select all crawlable URLs
-      newSelectedUrls = new Set(crawlableUrls);
-    } else {
-      // Deselect all URLs
-      newSelectedUrls = new Set();
-    }
-    // Call the callback prop to update the parent state
-    onSelectionChange(newSelectedUrls);
-  };
-
-  // Remove the internal handleCrawlSelectedClick handler.
-  // The button's onClick will now call props.onCrawlSelected directly.
-  // --- End Selection Logic Handlers ---
+  // --- Removed Selection Logic Handlers ---
 
   return (
     <div className="space-y-4 text-gray-300">
@@ -172,23 +117,11 @@ const CrawlStatusMonitor: React.FC<CrawlStatusMonitorProps> = ({
         {isLoading && <span className="text-sm text-blue-400 animate-pulse">Updating...</span>}
       </div>
 
-      {/* Overall Status, Times, and Crawl Button */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm items-center"> {/* Changed to 4 cols */}
+      {/* Simplified grid, removed Crawl Selected button */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm items-center">
         <div>Overall: <span className={`font-medium ${status.overall_status === 'error' ? 'text-red-500' : 'text-yellow-400'}`}>{status.overall_status}</span></div>
         <div>Start: <span className="text-gray-400">{formatDate(status.start_time)}</span></div>
         <div>End: <span className="text-gray-400">{formatDate(status.end_time)}</span></div>
-        {/* Moved Crawl Selected Button Here */}
-        {canCrawl && (
-           <div className="md:justify-self-end"> {/* Align button to the right on medium+ screens */}
-             <Button
-                onClick={onCrawlSelected} // Use prop
-                disabled={selectedCount === 0 || isCrawlingSelected} // Use props
-                size="sm"
-             >
-                {isCrawlingSelected ? 'Initiating...' : `Crawl Selected (${selectedCount})`} {/* Use props */}
-             </Button>
-           </div>
-        )}
       </div>
 
       {/* Overall Error Message */}
@@ -199,58 +132,7 @@ const CrawlStatusMonitor: React.FC<CrawlStatusMonitorProps> = ({
         </div>
       )}
 
-      {/* URL Status List */}
-      <div className="max-h-60 overflow-y-auto bg-gray-900/50 p-3 rounded-md border border-gray-700">
-        <h4 className="text-lg font-medium mb-2 text-cyan-400">
-          URL Progress ({totalUrlCount} total)
-        </h4>
-        {/* Conditionally render Select All checkbox only when discovery is complete */}
-        {canCrawl && Object.keys(status.urls).length > 0 && (
-          <div className="mb-2 flex items-center"> {/* Removed justify-between, button moved */}
-             <div className="flex items-center space-x-2">
-               <input
-                 type="checkbox"
-                 id="select-all"
-                 className="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                 checked={isSelectAllChecked}
-                 onChange={(e) => handleSelectAllChange(e.target.checked)}
-                 aria-label="Select all URLs"
-               />
-               <label htmlFor="select-all" className="text-sm text-gray-400">Select All ({crawlableUrls.length} crawlable)</label>
-             </div>
-             {/* Button removed from here */}
-          </div>
-        )}
-        {Object.entries(status.urls).length > 0 ? (
-           <ul className="space-y-1 text-sm">
-             {Object.entries(status.urls).map(([url, urlStatus]) => {
-               const isCrawlable = canCrawl && urlStatus === 'pending_crawl';
-               return (
-                 <li key={url} className={`flex items-center justify-between p-1 rounded ${isCrawlable ? 'hover:bg-gray-700/50' : 'opacity-60'}`}>
-                   <div className="flex items-center space-x-2 flex-grow min-w-0">
-                     {/* Render checkbox only if the URL is crawlable */}
-                     {isCrawlable ? (
-                       <input
-                         type="checkbox"
-                         className="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 flex-shrink-0"
-                         checked={selectedUrls.has(url)} // Use prop
-                         onChange={() => handleCheckboxChange(url)}
-                         aria-label={`Select URL ${url}`}
-                       />
-                     ) : (
-                       <div className="w-4 h-4 flex-shrink-0"></div> // Placeholder for alignment
-                     )}
-                     <span className="truncate" title={url}>{url}</span>
-                   </div>
-                   <span className="flex-shrink-0 ml-2">{getStatusIndicator(urlStatus)}</span>
-                 </li>
-               );
-             })}
-           </ul>
-         ) : (
-           <p className="text-gray-500 italic">No URLs being processed yet.</p>
-         )}
-      </div>
+      {/* Removed URL Status List */}
 
       {/* Optional: Raw Status Display for Debugging */}
       {/* <details className="mt-4">
