@@ -28,6 +28,7 @@ packages = ["src/fast_markdown_mcp"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+allow-missing-readme = true
 
 [project.urls]
 Documentation = "https://github.com/yourusername/fast-markdown-mcp#readme"

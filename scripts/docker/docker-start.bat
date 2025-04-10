@@ -11,6 +11,22 @@ set "NC=[0m"
 set "ROOT_DIR=%CD%"
 echo %BLUE%Project root directory: %ROOT_DIR%%NC%
 
+:: Fix docker-compose.yml file for Windows
+echo %BLUE%Ensuring docker-compose.yml is properly formatted...%NC%
+if exist "docker/compose/docker-compose.yml" (
+    :: Create a temporary file with the correct content and encoding
+    type nul > docker-compose.yml.tmp
+    :: Copy content line by line to ensure proper line endings
+    for /f "usebackq delims=" %%a in ("docker/compose/docker-compose.yml") do (
+        echo %%a>> docker-compose.yml.tmp
+    )
+    :: Replace the original file
+    move /y docker-compose.yml.tmp docker-compose.yml
+    echo %GREEN%docker-compose.yml has been fixed for Windows compatibility%NC%
+) else (
+    echo %RED%Warning: Could not find docker/compose/docker-compose.yml%NC%
+)
+
 :: Create necessary directories with proper permissions
 echo %BLUE%Creating necessary directories...%NC%
 if not exist logs mkdir logs
@@ -69,5 +85,3 @@ goto loop
 echo %BLUE%Shutting down services...%NC%
 docker-compose down
 echo %GREEN%All services stopped%NC%
-
-endlocal

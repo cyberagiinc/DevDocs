@@ -116,6 +116,38 @@ class MarkdownStore:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
+        except FileNotFoundError:
+            # Create a default metadata file with a pages array if the MD file exists
+            md_file_path = self.base_path / f"{file_id}.md"
+            if md_file_path.exists():
+                try:
+                    content = md_file_path.read_text(encoding='utf-8')
+                    # Create a basic metadata structure with pages array to mark as consolidated
+                    from datetime import datetime
+                    default_metadata = {
+                        "title": f"Documentation for {file_id}",
+                        "timestamp": datetime.now().isoformat(),
+                        "pages": [
+                            {
+                                "title": "Main Content",
+                                "url": f"file://{file_id}",
+                                "timestamp": datetime.now().isoformat(),
+                                "internal_links": 0,
+                                "external_links": 0
+                            }
+                        ],
+                        "is_consolidated": True,
+                        "last_updated": datetime.now().isoformat()
+                    }
+                    # Write the default metadata to file
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(default_metadata, f, indent=2)
+                    logger.info(f"Created default metadata for {file_id}")
+                    return default_metadata
+                except Exception as write_error:
+                    logger.error(f"Error creating default metadata for {file_id}: {write_error}")
+            logger.error(f"Error reading metadata for {file_id}: File not found")
+            return {}
         except Exception as e:
             logger.error(f"Error reading metadata for {file_id}: {e}")
             return {}

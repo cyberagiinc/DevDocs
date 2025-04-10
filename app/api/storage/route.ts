@@ -74,26 +74,71 @@ export async function GET(request: Request) {
               const jsonContent = await fs.readFile(jsonPath, 'utf-8')
               const metadata = JSON.parse(jsonContent)
               
-              // If the metadata has a "pages" array, it's a consolidated file
-              if (metadata.pages && Array.isArray(metadata.pages)) {
+              // If the metadata has a "pages" array or is_consolidated flag, it's a consolidated file
+              if ((metadata.pages && Array.isArray(metadata.pages)) || metadata.is_consolidated === true) {
                 isConsolidated = true
-                pagesCount = metadata.pages.length
+                pagesCount = metadata.pages ? metadata.pages.length : 1
                 rootUrl = metadata.root_url || ''
               }
             } catch (e) {
               console.error(`Error reading JSON metadata for ${filename}:`, e)
+              // Create a default metadata file if it doesn't exist or is invalid
+              try {
+                const defaultMetadata = {
+                  title: `Documentation for ${filename.replace('.md', '')}`,
+                  timestamp: new Date().toISOString(),
+                  pages: [
+                    {
+                      title: "Main Content",
+                      url: `file://${filename.replace('.md', '')}`,
+                      timestamp: new Date().toISOString(),
+                      internal_links: 0,
+                      external_links: 0
+                    }
+                  ],
+                  is_consolidated: true,
+                  last_updated: new Date().toISOString()
+                }
+                await fs.writeFile(jsonPath, JSON.stringify(defaultMetadata, null, 2), 'utf-8')
+                console.log(`Created default metadata for ${filename}`)
+                isConsolidated = true
+                pagesCount = 1
+              } catch (writeError) {
+                console.error(`Error creating default metadata for ${filename}:`, writeError)
+              }
             }
           } else {
             // Create JSON file if it doesn't exist
-            const jsonContent = JSON.stringify({
-              content,
-              metadata: {
-                wordCount: content.split(/\s+/).length,
-                charCount: content.length,
-                timestamp: stats.mtime
+            try {
+              // Create a consolidated metadata file by default
+              const defaultMetadata = {
+                title: `Documentation for ${filename.replace('.md', '')}`,
+                timestamp: new Date().toISOString(),
+                content,
+                pages: [
+                  {
+                    title: "Main Content",
+                    url: `file://${filename.replace('.md', '')}`,
+                    timestamp: new Date().toISOString(),
+                    internal_links: 0,
+                    external_links: 0
+                  }
+                ],
+                is_consolidated: true,
+                last_updated: new Date().toISOString(),
+                metadata: {
+                  wordCount: content.split(/\s+/).length,
+                  charCount: content.length,
+                  timestamp: stats.mtime
+                }
               }
-            }, null, 2)
-            await fs.writeFile(jsonPath, jsonContent, 'utf-8')
+              await fs.writeFile(jsonPath, JSON.stringify(defaultMetadata, null, 2), 'utf-8')
+              console.log(`Created consolidated metadata for ${filename}`)
+              isConsolidated = true
+              pagesCount = 1
+            } catch (writeError) {
+              console.error(`Error creating metadata for ${filename}:`, writeError)
+            }
           }
           
           // Extract sections to count how many pages are included
@@ -140,9 +185,22 @@ export async function GET(request: Request) {
       // Only show consolidated files in the Stored Files section
       const consolidatedFiles = allFiles.filter((file: DiskFileDetail) => file.isConsolidated)
       
+      // Additional filter to exclude files with UUID-like names
+      // UUID pattern: 8-4-4-4-12 hex digits (e.g., 095104d8-8e90-48f0-8670-9e45c914f115)
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      
+      // Keep only files with domain-like names (e.g., docs_crawl4ai_com)
+      // These are files created through the crawling process
+      const crawledFiles = consolidatedFiles.filter(file => {
+        // Check if the filename is NOT a UUID
+        return !uuidPattern.test(file.name)
+      })
+      
+      console.log(`Found ${consolidatedFiles.length} consolidated files, ${crawledFiles.length} are crawled files`)
+      
       return NextResponse.json({
         success: true,
-        files: consolidatedFiles
+        files: crawledFiles
       })
     }
     

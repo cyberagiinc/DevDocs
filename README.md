@@ -148,8 +148,10 @@ copy .env.template .env
 # Start all services using Docker
 docker-start.bat
 ```
+<details>
+<summary>Note for Windows Users</summary>
 
-> **Note for Windows Users**: If you encounter permission issues, you may need to run the script as administrator or manually set permissions on the logs, storage, and crawl_results directories. The script uses the `icacls` command to set permissions, which might require elevated privileges on some Windows systems.
+> If you encounter permission issues, you may need to run the script as administrator or manually set permissions on the logs, storage, and crawl_results directories. The script uses the `icacls` command to set permissions, which might require elevated privileges on some Windows systems.
 >
 > **Manually Setting Permissions on Windows**:
 >
@@ -173,6 +175,15 @@ docker-start.bat
 > icacls storage /grant Everyone:F /T
 > icacls crawl_results /grant Everyone:F /T
 > ```
+</details> 
+
+<details>
+<summary>Note about docker-compose.yml on Windows</summary>
+
+> If you encounter issues with the docker-compose.yml file (such as "Top-level object must be a mapping" error), the `docker-start.bat` script automatically fixes this by ensuring the file has the correct format and encoding. This fix is applied every time you run the script, so you don't need to manually modify the file.
+</details>
+
+
 
 This single command will:
 1. Create all necessary directories
@@ -249,15 +260,28 @@ DevDocs is more than a tool—it's your documentation companion that:
 
 1. **Open the "Modes" Interface**  
    - In **Roo Code**, click the **+** to create a new Mode-Specific Prompts.
+   <br>
+   
 2. **Name**  
    - Give the mode a **Name** (e.g., `Research_MCP`).  
+   <br>
 3. **Role Definition Prompt**
+  <details>
+  <summary>Prompt</summary>
+
 ```
 Expertise and Personality: Expertise: Developer documentation retrieval, technical synthesis, and documentation search. Personality: Systematic, detail-oriented, and precise. Provide well-structured answers with clear references to documentation sections.
 
 Behavioral Mandate: Always use the Table Of Contents and Section Access tools when addressing any query regarding the MCP documentation. Maintain clarity, accuracy, and traceability in your responses.
 ```
+  </details>
+ <br>
+
 4. **Mode-Specific Custom Instructions Prompt**
+<details>
+<summary> Prompt </summary>
+
+
 ```
 1. Table Of Contents Tool: Returns a full or filtered list of documentation topics. 
 2. Section Access Tool: Retrieves the detailed content of specific documentation sections.
@@ -290,6 +314,10 @@ Custom Instruction Loading: Additional custom instructions specific to Research_
 
 Final Output Construction: The final answer should be organized, directly address the query, and include clear pointers (e.g., section names or identifiers) back to the MCP documentation. Ensure minimal redundancy while covering all necessary details.
 ```
+
+</details>
+ <br>
+
 ## 🤝 Join Our Community
 
 - 🌟 [Star us on GitHub](https://github.com/cyberagi/devdocs)

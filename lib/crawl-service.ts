@@ -5,7 +5,8 @@ console.log(`Using backend URL: ${BACKEND_URL}`);
 
 export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): Promise<DiscoverResponse> { // Updated return type
   try {
-    console.log('Making request to backend:', `${BACKEND_URL}/api/discover`)
+    // Make a direct request to the backend API instead of going through the Next.js API route
+    console.log('Making direct request to backend:', `${BACKEND_URL}/api/discover`)
     console.log('Request payload:', { url, depth })
 
     const response = await fetch(`${BACKEND_URL}/api/discover`, {

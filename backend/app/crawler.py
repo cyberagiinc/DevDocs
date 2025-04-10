@@ -188,9 +188,31 @@ async def discover_pages(
             response = requests.post(
                 f"{CRAWL4AI_URL}/crawl",
                 headers=headers,
+                f"{CRAWL4AI_URL}/crawl",
+                headers=headers,
                 json=simple_request,
                 timeout=30
             )
+            
+            # Log the response status and headers
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {response.headers}")
+            
+            # Check if the response is valid JSON
+            try:
+                response_json = response.json()
+                logger.info(f"Response JSON: {response_json}")
+            except Exception as json_error:
+                logger.error(f"Response is not valid JSON: {str(json_error)}")
+                logger.error(f"Response text: {response.text[:500]}")
+                # Return a page with error status
+                return [DiscoveredPage(
+                    url=url,
+                    title=f"Invalid Response: Crawl4AI service returned invalid JSON",
+                    status="error",
+                    internalLinks=[]
+                )]
+            
             response.raise_for_status()
             task_id = response.json()["task_id"]
             logger.info(f"Submitted link discovery task for {url}, task ID: {task_id} (Job ID: {job_id})")
@@ -202,7 +224,7 @@ async def discover_pages(
                 await asyncio.sleep(poll_interval) # Use await for asyncio.sleep
                 logger.debug(f"Polling link discovery task {task_id} (attempt {attempt+1}/{max_attempts})")
                 status_response = requests.get(
-                    f"{CRAWL4AI_URL}/task/{task_id}",
+                    poll_url,
                     headers=headers,
                     timeout=10
                 )
@@ -210,6 +232,16 @@ async def discover_pages(
                 status = status_response.json()
 
                 if status["status"] == "completed":
+                    # Check if result field exists
+                    if "result" not in status:
+                        logger.error(f"Task completed but no 'result' field in response: {status}")
+                        return [DiscoveredPage(
+                            url=url,
+                            title=f"Invalid Response: No result in completed task response",
+                            status="error",
+                            internalLinks=[]
+                        )]
+                    
                     result = status["result"]
                     logger.info(f"Link discovery task {task_id} for {url} completed successfully (Job ID: {job_id})")
                     # Mark URL as pending crawl, ready for the next phase

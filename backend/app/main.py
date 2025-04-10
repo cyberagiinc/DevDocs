@@ -482,6 +482,8 @@ async def discover_endpoint(request: DiscoverRequest, background_tasks: Backgrou
             "job_id": job_id,
             "success": True
         }
+        logger.info(f"Returning response with {len(response_data['pages'])} pages")
+        return response_data
     except Exception as e:
         logger.error(f"Error initiating discovery for {request.url}: {str(e)}", exc_info=True)
         # Return a structured error response immediately if initiation fails

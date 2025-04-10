@@ -97,7 +97,8 @@ export default function Home() {
       setDiscoveredPages(pages) // This is now handled by polling/status monitor
       setStats(prev => ({ // Stats are now part of the job status
         ...prev,
-        subdomainsParsed: pages.length
+        subdomainsParsed: pages.length,
+        errorsEncountered: pages.filter((page: DiscoveredPage) => page.status === 'error').length
       }))
 
       toast({ // Toast is now handled above when job starts
