@@ -5,17 +5,19 @@ import signal
 import json
 import re
 import asyncio
+import math
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple, Any
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
 
-from .document_structure import DocumentStructure
+from .document_structure import DocumentStructure, Section
 
 class MarkdownStore:
     """Manages markdown content and metadata."""
@@ -25,6 +27,25 @@ class MarkdownStore:
         self.content_cache = {}
         self.metadata_cache = {}
         self.structure_cache = {}  # Cache for parsed document structures
+        
+    def _calculate_similarity(self, text1: str, text2: str) -> float:
+        """Calculate text similarity using SequenceMatcher."""
+        return SequenceMatcher(None, text1.lower(), text2.lower()).ratio()
+    
+    def _calculate_confidence(self, similarity: float, match_type: str) -> float:
+        """Calculate confidence score based on similarity and match type."""
+        # Base confidence from similarity score
+        confidence = similarity
+        
+        # Adjust based on match type
+        if match_type == "exact":
+            confidence = min(1.0, confidence * 1.2)  # Boost exact matches
+        elif match_type == "fuzzy":
+            confidence = confidence * 0.9  # Slightly reduce fuzzy matches
+        elif match_type == "regex":
+            confidence = confidence * 0.95  # Slightly reduce regex matches
+            
+        return round(confidence, 2)
         
     async def sync_all_files(self):
         """Initial sync of all files in the storage directory."""
@@ -221,6 +242,205 @@ Context:
         except Exception as e:
             logger.error(f"Error searching files: {e}")
             return f"Error searching files: {str(e)}"
+            
+    async def smart_section_search(self, query: str, max_results: int = 10,
+                                  use_fuzzy: bool = True, use_regex: bool = True) -> str:
+        """
+        Advanced search for sections across all markdown files with ranking and confidence scores.
+        
+        Args:
+            query: The search query
+            max_results: Maximum number of results to return
+            use_fuzzy: Whether to use fuzzy matching
+            use_regex: Whether to use regex matching
+            
+        Returns:
+            Formatted search results with rankings, confidence scores, and citations
+        """
+        try:
+            all_matches = []
+            
+            # Process all markdown files
+            for md_file in self.base_path.glob("*.md"):
+                file_id = md_file.stem
+                
+                # Ensure the document structure is loaded
+                if file_id not in self.structure_cache:
+                    await self.get_content(file_id)
+                
+                structure = self.structure_cache[file_id]
+                
+                # Get all sections from the document
+                sections = []
+                
+                def collect_sections(section_list):
+                    for section in section_list:
+                        sections.append(section)
+                        collect_sections(section.subsections)
+                
+                collect_sections(structure.sections)
+                
+                # Search through each section
+                for section in sections:
+                    matches = []
+                    
+                    # Exact match in title
+                    if query.lower() in section.title.lower():
+                        similarity = self._calculate_similarity(query, section.title)
+                        confidence = self._calculate_confidence(similarity, "exact")
+                        matches.append({
+                            "match_type": "exact_title",
+                            "similarity": similarity,
+                            "confidence": confidence,
+                            "score": confidence * 1.2  # Boost title matches
+                        })
+                    
+                    # Exact match in content
+                    if query.lower() in section.content.lower():
+                        similarity = self._calculate_similarity(query,
+                                                              section.content[:min(len(section.content),
+                                                                                 len(query) * 10)])
+                        confidence = self._calculate_confidence(similarity, "exact")
+                        matches.append({
+                            "match_type": "exact_content",
+                            "similarity": similarity,
+                            "confidence": confidence,
+                            "score": confidence
+                        })
+                    
+                    # Fuzzy match
+                    if use_fuzzy:
+                        # Fuzzy match in title
+                        title_similarity = self._calculate_similarity(query, section.title)
+                        if title_similarity > 0.6:  # Threshold for fuzzy matches
+                            confidence = self._calculate_confidence(title_similarity, "fuzzy")
+                            matches.append({
+                                "match_type": "fuzzy_title",
+                                "similarity": title_similarity,
+                                "confidence": confidence,
+                                "score": confidence * 1.1  # Slightly boost title matches
+                            })
+                        
+                        # Fuzzy match in content (first 1000 chars to avoid performance issues)
+                        content_sample = section.content[:min(len(section.content), 1000)]
+                        # Split content into chunks to find best matching segment
+                        chunks = [content_sample[i:i+len(query)*3]
+                                 for i in range(0, len(content_sample), len(query)*2)
+                                 if i+len(query)*3 <= len(content_sample)]
+                        
+                        if chunks:
+                            best_chunk_similarity = max(self._calculate_similarity(query, chunk)
+                                                      for chunk in chunks)
+                            if best_chunk_similarity > 0.6:
+                                confidence = self._calculate_confidence(best_chunk_similarity, "fuzzy")
+                                matches.append({
+                                    "match_type": "fuzzy_content",
+                                    "similarity": best_chunk_similarity,
+                                    "confidence": confidence,
+                                    "score": confidence
+                                })
+                    
+                    # Regex match
+                    if use_regex:
+                        try:
+                            pattern = re.compile(query, re.IGNORECASE)
+                            
+                            # Regex match in title
+                            if pattern.search(section.title):
+                                # Calculate how much of the title matches the pattern
+                                match_length = sum(len(m.group(0)) for m in pattern.finditer(section.title))
+                                similarity = match_length / len(section.title)
+                                confidence = self._calculate_confidence(similarity, "regex")
+                                matches.append({
+                                    "match_type": "regex_title",
+                                    "similarity": similarity,
+                                    "confidence": confidence,
+                                    "score": confidence * 1.1  # Slightly boost title matches
+                                })
+                            
+                            # Regex match in content
+                            if pattern.search(section.content):
+                                # Calculate how much of the content matches the pattern
+                                match_length = sum(len(m.group(0)) for m in pattern.finditer(section.content[:1000]))
+                                similarity = match_length / min(len(section.content), 1000)
+                                confidence = self._calculate_confidence(similarity, "regex")
+                                matches.append({
+                                    "match_type": "regex_content",
+                                    "similarity": similarity,
+                                    "confidence": confidence,
+                                    "score": confidence
+                                })
+                        except re.error:
+                            # If the query isn't a valid regex, just skip regex matching
+                            pass
+                    
+                    # If we have any matches, add this section to the results
+                    if matches:
+                        # Get the best match
+                        best_match = max(matches, key=lambda x: x["score"])
+                        
+                        # Extract a relevant snippet from the content
+                        snippet = section.content
+                        if len(snippet) > 300:
+                            # Try to find the query in the content
+                            query_pos = section.content.lower().find(query.lower())
+                            if query_pos >= 0:
+                                # Extract content around the query
+                                start = max(0, query_pos - 100)
+                                end = min(len(section.content), query_pos + len(query) + 100)
+                                snippet = "..." + section.content[start:end] + "..."
+                            else:
+                                # Just take the first part of the content
+                                snippet = section.content[:300] + "..."
+                        
+                        # Create a section ID if needed
+                        section_id = structure._make_section_id(section.title)
+                        
+                        all_matches.append({
+                            "file_id": file_id,
+                            "section_title": section.title,
+                            "section_id": section_id,
+                            "snippet": snippet,
+                            "match_type": best_match["match_type"],
+                            "confidence": best_match["confidence"],
+                            "score": best_match["score"]
+                        })
+            
+            # Sort results by score (descending)
+            all_matches.sort(key=lambda x: x["score"], reverse=True)
+            
+            # Limit to max_results
+            all_matches = all_matches[:max_results]
+            
+            # Format results
+            if not all_matches:
+                return f"No matches found for query: {query}"
+            
+            results = [f"# Smart Section Search Results for: '{query}'"]
+            
+            for i, match in enumerate(all_matches, 1):
+                confidence_percent = int(match["confidence"] * 100)
+                match_type_display = match["match_type"].replace("_", " ").title()
+                
+                results.append(f"""
+## Result {i} - {match["section_title"]} (Confidence: {confidence_percent}%)
+
+**File:** {match["file_id"]}.md
+**Section:** {match["section_title"]}
+**Match Type:** {match_type_display}
+**Confidence:** {confidence_percent}%
+
+**Snippet:**
+{match["snippet"]}
+
+**Citation:** `{match["file_id"]}#{match["section_id"]}`
+
+---""")
+            
+            return "\n".join(results)
+        except Exception as e:
+            logger.error(f"Error in smart section search: {e}")
+            return f"Error performing smart section search: {str(e)}"
 
     async def search_by_tag(self, tag: str) -> str:
         """Search files by metadata tags."""
@@ -478,6 +698,32 @@ class FastMarkdownServer:
                         },
                         "required": ["file_id"]
                     }
+                ),
+                types.Tool(
+                    name="smart_section_search",
+                    description="Advanced search for sections with ranking and confidence scores",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search query to find in sections"
+                            },
+                            "max_results": {
+                                "type": "number",
+                                "description": "Maximum number of results to return (default: 10)"
+                            },
+                            "use_fuzzy": {
+                                "type": "boolean",
+                                "description": "Whether to use fuzzy matching (default: true)"
+                            },
+                            "use_regex": {
+                                "type": "boolean",
+                                "description": "Whether to use regex matching (default: true)"
+                            }
+                        },
+                        "required": ["query"]
+                    }
                 )
             ]
 
@@ -528,6 +774,33 @@ class FastMarkdownServer:
                 if not file_id:
                     raise ValueError("file_id is required")
                 result = await self.store.get_table_of_contents(file_id)
+                return [types.TextContent(type="text", text=result)]
+            elif name == "smart_section_search":
+                query = arguments.get("query")
+                if not query:
+                    raise ValueError("query is required")
+                
+                # Get optional parameters with defaults
+                max_results = arguments.get("max_results", 10)
+                use_fuzzy = arguments.get("use_fuzzy", True)
+                use_regex = arguments.get("use_regex", True)
+                
+                # Ensure max_results is an integer
+                try:
+                    max_results = int(max_results)
+                except (ValueError, TypeError):
+                    max_results = 10
+                
+                # Ensure boolean parameters are actually booleans
+                use_fuzzy = bool(use_fuzzy)
+                use_regex = bool(use_regex)
+                
+                result = await self.store.smart_section_search(
+                    query,
+                    max_results=max_results,
+                    use_fuzzy=use_fuzzy,
+                    use_regex=use_regex
+                )
                 return [types.TextContent(type="text", text=result)]
             else:
                 raise ValueError(f"Unknown tool: {name}")
