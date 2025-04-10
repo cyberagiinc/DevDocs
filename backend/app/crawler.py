@@ -188,8 +188,6 @@ async def discover_pages(
             response = requests.post(
                 f"{CRAWL4AI_URL}/crawl",
                 headers=headers,
-                f"{CRAWL4AI_URL}/crawl",
-                headers=headers,
                 json=simple_request,
                 timeout=30
             )
