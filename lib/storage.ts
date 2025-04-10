@@ -26,10 +26,12 @@ export async function loadMarkdown(url: string) {
     if (!response.ok) {
       throw new Error('Failed to load markdown')
     }
-
-    return await response.json()
+    
+    const data = await response.json()
+    // Return just the content string rather than the entire response object
+    return data.content || ''
   } catch (error) {
     console.error('Error loading markdown:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to load markdown' }
+    return ''
   }
 }

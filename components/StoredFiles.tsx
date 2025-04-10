@@ -26,7 +26,11 @@ interface StoredFile {
   isInMemory?: boolean
 }
 
-export default function StoredFiles() {
+interface StoredFilesProps {
+  onLoad?: (content: string, id: string) => void;
+}
+
+export default function StoredFiles({ onLoad }: StoredFilesProps = {}) {
   const [files, setFiles] = useState<StoredFile[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -119,6 +123,49 @@ export default function StoredFiles() {
       .join(' - ')              // Join with dashes
   }
 
+  const handleLoadFile = async (file: StoredFile) => {
+    if (!onLoad) return;
+    
+    try {
+      if (file.isInMemory) {
+        // For in-memory files, we need to fetch the content from the backend API
+        const fileId = file.markdownPath.split('/').pop()?.replace(/\.(json|md)$/, '') || '';
+        const response = await fetch(`/api/memory-file?id=${encodeURIComponent(fileId)}`);
+        
+        if (!response.ok) {
+          console.error('Failed to fetch in-memory file:', response.statusText);
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.content) {
+          console.error('Invalid response format or empty content');
+          return;
+        }
+        
+        onLoad(data.content, file.name);
+      } else {
+        // For disk files, fetch using the storage API
+        const response = await fetch(`/api/storage/load?id=${encodeURIComponent(file.name)}`);
+        
+        if (!response.ok) {
+          console.error('Failed to load markdown file:', response.statusText);
+          return;
+        }
+        
+        const data = await response.json();
+        if (data.content) {
+          onLoad(data.content, file.name);
+        } else {
+          console.error('Invalid response format or empty content');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading file:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-gray-800 bg-gray-900/50 backdrop-blur-sm p-8">
@@ -190,7 +237,11 @@ export default function StoredFiles() {
           </thead>
           <tbody className="divide-y divide-gray-800">
             {files.map((file) => (
-              <tr key={file.name} className="group hover:bg-gray-800/40 transition-all duration-200 ease-in-out">
+              <tr 
+                key={file.name} 
+                className="group hover:bg-gray-800/40 transition-all duration-200 ease-in-out cursor-pointer"
+                onClick={() => handleLoadFile(file)}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     {file.isConsolidated && (

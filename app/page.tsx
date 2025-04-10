@@ -7,6 +7,7 @@ import SubdomainList from '@/components/SubdomainList'
 import MarkdownOutput from '@/components/MarkdownOutput'
 import StoredFiles from '@/components/StoredFiles'
 import ConfigSettings from '@/components/ConfigSettings'
+import MarkdownCombiner from '@/components/MarkdownCombiner'
 import { discoverSubdomains, crawlPages, validateUrl, formatBytes } from '@/lib/crawl-service'
 import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
@@ -245,17 +246,8 @@ export default function Home() {
         ...prev,
         errorsEncountered: prev.errorsEncountered + 1
       }))
-      // Update status to error for failed pages
-      setDiscoveredPages(pages =>
-        pages.map(page => ({
-          ...page,
-          status: selectedUrls.includes(page.url) ? 'error' as const : page.status,
-          internalLinks: page.internalLinks?.map(link => ({
-            ...link,
-            status: selectedUrls.includes(link.href) ? 'error' as const : link.status || 'pending'
-          }))
-        }))
-      )
+      
+      // Show error toast
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to crawl pages",
@@ -265,6 +257,21 @@ export default function Home() {
       setIsCrawling(false)
     }
   }
+
+  const handleLoadMarkdown = (content: string, id: string) => {
+    setUrl(id)
+    setMarkdown(content)
+    setDiscoveredPages([])
+  }
+
+  // Allow overriding content
+  useEffect(() => {
+    if (markdown) {
+      document.title = `DevDocs - ${url}`
+    } else {
+      document.title = 'DevDocs'
+    }
+  }, [markdown, url])
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -312,8 +319,13 @@ export default function Home() {
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
-          <h2 className="text-2xl font-semibold mb-4 text-blue-400">Consolidated Files</h2>
-          <StoredFiles />
+          <h2 className="text-2xl font-semibold mb-4 text-green-400">Stored Files</h2>
+          <StoredFiles onLoad={handleLoadMarkdown} />
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
+          <h2 className="text-2xl font-semibold mb-4 text-pink-400">Combine Files</h2>
+          <MarkdownCombiner />
         </div>
         
         {/* Config and Settings popup with MCP Server and Discovered Pages */}
