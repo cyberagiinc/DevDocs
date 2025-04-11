@@ -20,6 +20,7 @@ interface FileDetails {
 }
 
 export async function GET(request: Request) {
+  console.log('[API] /api/all-files route called at', new Date().toISOString());
   try {
     // Only get .md files
     const files = await fs.readdir(STORAGE_DIR)

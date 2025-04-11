@@ -5,7 +5,8 @@ import path from 'path'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const filePath = searchParams.get('path')
+    // Correctly get the 'file_path' parameter sent by the frontend
+    const filePath = searchParams.get('file_path')
 
     if (!filePath) {
       return NextResponse.json(
@@ -14,15 +15,24 @@ export async function GET(request: Request) {
       )
     }
 
-    console.log(`Download requested for file: ${filePath}`)
+    console.log(`[Download Debug] Received raw file path parameter: ${filePath}`)
 
     // Security check to ensure the path is within the storage directory
     const storagePath = path.join(process.cwd(), 'storage/markdown')
-    const normalizedPath = path.normalize(filePath)
-    if (!normalizedPath.startsWith(storagePath)) {
-      console.error(`Security check failed: ${normalizedPath} is outside of ${storagePath}`)
+    // *** Problem Area: Construct the full path from the filename parameter ***
+    // const normalizedPath = path.normalize(filePath) // Original incorrect line
+    const normalizedPath = path.normalize(path.join(storagePath, filePath)) // Attempt to construct full path
+    
+    console.log(`[Download Debug] Calculated storagePath: ${storagePath}`)
+    console.log(`[Download Debug] Constructed normalizedPath: ${normalizedPath}`)
+    
+    const isPathValid = normalizedPath.startsWith(storagePath)
+    console.log(`[Download Debug] Security check (normalizedPath startsWith storagePath): ${isPathValid}`)
+
+    if (!isPathValid) {
+      console.error(`[Download Debug] Security check failed: Constructed path ${normalizedPath} is outside of allowed storage directory ${storagePath}`)
       return NextResponse.json(
-        { success: false, error: 'Invalid file path' },
+        { success: false, error: 'Invalid file path requested' },
         { status: 403 }
       )
     }

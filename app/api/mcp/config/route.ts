@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log(`[API MCP Config] Successfully fetched config.`);
+    console.log(`[API MCP Config] Successfully fetched config. Data received from backend:`, JSON.stringify(data)); // Roo Debug Log
     return NextResponse.json(data);
 
   } catch (error) {

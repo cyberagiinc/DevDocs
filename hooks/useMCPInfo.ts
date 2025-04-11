@@ -1,11 +1,11 @@
 "use client"; // Hooks are client-side
 
 import { useState, useCallback } from 'react';
-import { MCPConfig, MCPStatus } from '@/lib/types'; // Import the newly defined types
+import { MCPConfigResponse, MCPStatus } from '@/lib/types'; // Use the new MCPConfigResponse type
 
 // Define the state structure for the hook
 interface MCPInfoState {
-  configData: MCPConfig | null;
+  configData: MCPConfigResponse | null; // Use the new MCPConfigResponse type
   statusData: MCPStatus | null;
   isLoading: boolean;
   error: Error | null;
@@ -61,28 +61,31 @@ export function useMCPInfo(): UseMCPInfoReturn {
       }
 
       // Parse JSON data
-      const configData: MCPConfig = await configResponse.json();
+      const configData: MCPConfigResponse = await configResponse.json(); // Use the new MCPConfigResponse type
       const statusData: MCPStatus = await statusResponse.json();
 
-      console.log("useMCPInfo: Fetch successful", { configData, statusData }); // Add console log
+      console.log("useMCPInfo: Fetch successful. Preparing to set state:", { configData, statusData, isLoading: false }); // Roo Debug Log: Before success setState
 
       setState({
         configData,
         statusData,
-        isLoading: false,
+        isLoading: false, // Explicitly setting isLoading to false
         error: null,
       });
+      console.log("useMCPInfo: State update called for success."); // Roo Debug Log: After success setState call
 
     } catch (err) {
       console.error("useMCPInfo: Error fetching MCP info:", err); // Add console log for error
       const error = err instanceof Error ? err : new Error('An unknown error occurred during fetch');
+      console.log("useMCPInfo: Error caught. Preparing to set error state:", { error, isLoading: false }); // Roo Debug Log: Before error setState
       setState(prevState => ({
         ...prevState,
-        isLoading: false,
+        isLoading: false, // Explicitly setting isLoading to false
         error: error, // Store the actual Error object
         configData: null, // Clear data on error
         statusData: null, // Clear data on error
       }));
+      console.log("useMCPInfo: State update called for error."); // Roo Debug Log: After error setState call
     }
   }, []); // Empty dependency array means this function is created once
 

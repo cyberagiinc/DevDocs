@@ -104,17 +104,33 @@ export interface CrawlUrlsProps {
 
 // --- Types for MCP Settings ---
 
-export interface MCPServerInfo {
-  host: string;
-  port: number;
+// Old config structure (host/port based) - Commented out as it's replaced by MCPServerConfig
+// export interface MCPServerInfo {
+//   host: string;
+//   port: number;
+//   disabled: boolean;
+//   containerized: boolean;
+//   // Add other potential fields if needed in the future
+// }
+//
+// export interface MCPConfig {
+//   mcpServers: {
+//     [serverName: string]: MCPServerInfo;
+//   };
+// }
+
+// New config structure (command/args based for stdio/docker exec)
+export interface MCPServerConfig {
+  command: string;
+  args: string[];
+  env: Record<string, string>; // Environment variables
   disabled: boolean;
-  containerized: boolean;
-  // Add other potential fields if needed in the future
+  alwaysAllow?: string[]; // Optional list of always allowed tools
 }
 
-export interface MCPConfig {
+export interface MCPConfigResponse {
   mcpServers: {
-    [serverName: string]: MCPServerInfo;
+    [serverName: string]: MCPServerConfig;
   };
 }
 

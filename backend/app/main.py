@@ -123,22 +123,28 @@ async def health_check():
 async def get_mcp_config():
     """Get MCP server configuration"""
     try:
-        # Get MCP host from environment variable or use container name
-        mcp_host = os.environ.get("MCP_HOST", "mcp")
-        logger.info(f"Using MCP host: {mcp_host}")
-
-        # Since the MCP server is now running in a container, we don't need to provide
-        # the command, args, and env. Instead, we'll just provide the container name.
+        # TODO: Move this hardcoded config to a separate config file/env vars if more servers are added.
+        # This structure represents how the frontend expects to launch the MCP server
+        # via docker exec / stdio, not via host/port network connection.
         config = {
             "mcpServers": {
                 "fast-markdown": {
-                    "host": mcp_host,
-                    "port": 8765,  # Default port for MCP server
+                    "command": "docker",
+                    "args": [
+                        "exec", "-i", "devdocs-mcp", # Assuming 'devdocs-mcp' is the container name
+                        "python", "-m", "fast_markdown_mcp.server", "/app/storage/markdown"
+                    ],
+                    "env": {},
                     "disabled": False,
-                    "containerized": True  # Indicate that the MCP server is running in a container
+                    "alwaysAllow": [
+                        "sync_file", "get_status", "list_files", "read_file",
+                        "search_files", "search_by_tag", "get_stats",
+                        "get_section", "get_table_of_contents"
+                    ]
                 }
             }
         }
+        logger.info("Returning hardcoded MCP server config (stdio/docker exec based)")
         return config
     except Exception as e:
         logger.error(f"Error generating config: {str(e)}", exc_info=True)

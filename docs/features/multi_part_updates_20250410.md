@@ -9,16 +9,16 @@ This document tracks several related fixes and UI adjustments requested after re
 
 **Tasks:**
 
-1.  **[In Progress] Fix MCP Settings Popover Error:**
-    *   **Problem:** Popover fails with `net::ERR_NAME_NOT_RESOLVED` when fetching `/api/mcp/config` and `/api/mcp/status`.
-    *   **Likely Cause:** The `useMCPInfo` hook is likely making direct calls using an internal backend URL instead of relative Next.js API paths.
-    *   **Plan:** Delegate to `Code` mode to fix fetch calls in `hooks/useMCPInfo.ts`.
-    *   **Status:** Pending Delegation
+1.  **[DONE] Fix MCP Settings Popover Error:**
+    *   **Problem:** Popover failed with `net::ERR_NAME_NOT_RESOLVED` and then `404 Not Found`.
+    *   **Fix 1:** Updated `hooks/useMCPInfo.ts` to use relative paths (`/api/mcp/config`, `/api/mcp/status`).
+    *   **Fix 2:** Created missing API routes `app/api/mcp/config/route.ts` and `app/api/mcp/status/route.ts` to proxy requests to the backend service.
+    *   **Status:** Resolved
 
-2.  **[Pending] Adjust Settings Button Placement:**
+2.  **[In Progress] Adjust Settings Button Placement:**
     *   **Request:** Move the "Settings" button inside the "Statistics" container, top-right corner.
     *   **Plan:** Delegate to `Code` mode to modify layout in `app/page.tsx`.
-    *   **Status:** Not Started
+    *   **Status:** Pending Delegation
 
 3.  **[Pending] Fix URL Crawl Status Update:**
     *   **Problem:** URLs in the "Crawl Queue" UI do not update their status to "completed" after being crawled successfully.

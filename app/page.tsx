@@ -24,7 +24,7 @@ import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
 import { DiscoveredPage, CrawlJobStatus, OverallStatus, UrlStatus } from '@/lib/types' // Import status types & UrlStatus
 import ConsolidatedFiles from '@/components/ConsolidatedFiles'; // Import ConsolidatedFiles
-import { MCPSettingsPopover } from '@/components/MCPSettingsPopover'; // Import MCP Settings Popover (Named Export)
+import { MCPConfigDialog } from '@/components/MCPConfigDialog'; // Import the renamed MCP Config Dialog
 
 export default function Home() {
   const [url, setUrl] = useState('')
@@ -346,19 +346,27 @@ const handleCrawlSelectedClick = async () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Container for Job Stats and Settings Button */}
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
-          <div className="flex justify-between items-start"> {/* Flex container - Align items to top */}
-            {/* JobStatsSummary remains here */}
-            <JobStatsSummary jobStatus={jobStatus} />
-            {/* MCP Settings Popover Trigger */}
-            <MCPSettingsPopover>
-              <Button variant="outline" size="icon" aria-label="MCP Settings" className="bg-white text-black hover:bg-gray-100 hover:text-black">
+        {/* Removed outer container div for Statistics/Data section */}
+          {/* Header for Statistics section - Title only */}
+          {/* Removed Statistics header */}
+          {/* Container for Data Label (implicit in JobStatsSummary) + Icon + Stats */}
+          {/* Container for Data Label (implicit in JobStatsSummary) + Icon */}
+          {/* Use flex to align the (implicit) Data label and the icon */}
+          {/* Container for implicit "Data" label (from JobStatsSummary) and the settings icon */}
+          <div className="flex justify-between items-center mb-4">
+            {/* Placeholder for the "Data" label which should be rendered by JobStatsSummary */}
+            {/* We might need to adjust JobStatsSummary later if it doesn't render the label */}
+            <div></div>
+            {/* Settings Icon aligned to the right */}
+            <MCPConfigDialog>
+              <Button variant="outline" size="icon" aria-label="MCP Server Configuration" className="bg-white text-black hover:bg-gray-100 hover:text-black">
                 <Settings className="h-4 w-4" />
               </Button>
-            </MCPSettingsPopover>
+            </MCPConfigDialog>
           </div>
-        </div>
+          {/* Render JobStatsSummary below the header */}
+          <JobStatsSummary jobStatus={jobStatus} />
+        {/* Removed closing tag for the outer container div */}
 
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
           <h2 className="text-2xl font-semibold mb-4 text-blue-400">Start Exploration</h2>
@@ -433,8 +441,8 @@ const handleCrawlSelectedClick = async () => {
           <ConsolidatedFiles />
         </div>
         
-        {/* Config and Settings popup with MCP Server and Discovered Pages */}
-        <ConfigSettings />
+        {/* Config and Settings popup - Ensure it remains commented out */}
+        {/* <ConfigSettings /> */}
       </div>
 
       <footer className="py-8 text-center text-gray-400">

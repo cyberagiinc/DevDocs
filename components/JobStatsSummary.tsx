@@ -44,7 +44,7 @@ const JobStatsSummary: React.FC<JobStatsSummaryProps> = ({
   return (
     <Card className="bg-gray-800/50 backdrop-blur-lg border-gray-700 shadow-xl w-full">
       <CardHeader>
-        <CardTitle className="text-xl font-semibold text-purple-400">Statistics</CardTitle>
+        <CardTitle className="text-xl font-semibold text-purple-400">Data</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
