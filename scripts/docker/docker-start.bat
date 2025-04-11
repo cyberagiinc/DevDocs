@@ -27,6 +27,60 @@ if exist "docker/compose/docker-compose.yml" (
     echo %RED%Warning: Could not find docker/compose/docker-compose.yml%NC%
 )
 
+:: Fix configuration files for Docker build
+echo %BLUE%Ensuring configuration files are properly set up...%NC%
+
+:: Copy next.config.mjs
+if exist "config/next.config.mjs" (
+    :: Create a temporary file with the correct content and encoding
+    type nul > next.config.mjs.tmp
+    :: Copy content line by line to ensure proper line endings
+    for /f "usebackq delims=" %%a in ("config/next.config.mjs") do (
+        echo %%a>> next.config.mjs.tmp
+    )
+    :: Replace the original file
+    move /y next.config.mjs.tmp next.config.mjs
+    echo %GREEN%next.config.mjs has been fixed for Docker compatibility%NC%
+) else (
+    echo %RED%Warning: Could not find config/next.config.mjs%NC%
+)
+
+:: Copy postcss.config.mjs
+if exist "config/postcss.config.mjs" (
+    type nul > postcss.config.mjs.tmp
+    for /f "usebackq delims=" %%a in ("config/postcss.config.mjs") do (
+        echo %%a>> postcss.config.mjs.tmp
+    )
+    move /y postcss.config.mjs.tmp postcss.config.mjs
+    echo %GREEN%postcss.config.mjs has been fixed for Docker compatibility%NC%
+) else (
+    echo %RED%Warning: Could not find config/postcss.config.mjs%NC%
+)
+
+:: Copy tailwind.config.ts
+if exist "config/tailwind.config.ts" (
+    type nul > tailwind.config.ts.tmp
+    for /f "usebackq delims=" %%a in ("config/tailwind.config.ts") do (
+        echo %%a>> tailwind.config.ts.tmp
+    )
+    move /y tailwind.config.ts.tmp tailwind.config.ts
+    echo %GREEN%tailwind.config.ts has been fixed for Docker compatibility%NC%
+) else (
+    echo %RED%Warning: Could not find config/tailwind.config.ts%NC%
+)
+
+:: Copy tsconfig.json
+if exist "config/tsconfig.json" (
+    type nul > tsconfig.json.tmp
+    for /f "usebackq delims=" %%a in ("config/tsconfig.json") do (
+        echo %%a>> tsconfig.json.tmp
+    )
+    move /y tsconfig.json.tmp tsconfig.json
+    echo %GREEN%tsconfig.json has been fixed for Docker compatibility%NC%
+) else (
+    echo %RED%Warning: Could not find config/tsconfig.json%NC%
+)
+
 :: Create necessary directories with proper permissions
 echo %BLUE%Creating necessary directories...%NC%
 if not exist logs mkdir logs
