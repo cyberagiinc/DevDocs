@@ -4,6 +4,21 @@ import path from 'path'
 
 const STORAGE_DIR = path.join(process.cwd(), 'storage/markdown')
 
+// Define the structure for file details returned by this API
+interface FileDetails {
+  name: string;
+  jsonPath: string;
+  markdownPath: string;
+  timestamp: Date;
+  size: number;
+  wordCount: number;
+  charCount: number;
+  isConsolidated: boolean;
+  pagesCount: number;
+  rootUrl: string;
+  isInMemory: boolean;
+}
+
 export async function GET(request: Request) {
   try {
     // Only get .md files
@@ -87,34 +102,10 @@ export async function GET(request: Request) {
       metadata?: any;
     }
     
-    // Get in-memory files from the backend
-    let memoryFiles = []
-    try {
-      const memoryResponse = await fetch('http://backend:24125/api/memory-files')
-      if (memoryResponse.ok) {
-        const memoryData = await memoryResponse.json()
-        if (memoryData.success && Array.isArray(memoryData.files)) {
-          // Convert in-memory files to the same format as disk files
-          memoryFiles = memoryData.files
-            .filter((file: MemoryFile) => !file.isJson) // Only include markdown files
-            .map((file: MemoryFile) => ({
-              name: file.name,
-              jsonPath: file.path.replace('.md', '.json'),
-              markdownPath: file.path,
-              timestamp: new Date(file.timestamp),
-              size: file.size,
-              wordCount: file.wordCount,
-              charCount: file.charCount,
-              isConsolidated: false,
-              pagesCount: 1,
-              rootUrl: '',
-              isInMemory: true
-            }))
-        }
-      }
-    } catch (e) {
-      console.error('Error fetching in-memory files:', e)
-    }
+    // Removed fetch for /api/memory-files as the endpoint no longer exists in the backend.
+    // The concept of separate "memory files" fetched via API is deprecated.
+    // The 'memoryFiles' array remains empty, and the route now only lists files from disk.
+    const memoryFiles: FileDetails[] = [] // Explicitly type the empty array
     
     // Combine disk and memory files - return ALL files, not just consolidated ones
     const allFiles = [...diskFileDetails, ...memoryFiles]

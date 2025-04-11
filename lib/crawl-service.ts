@@ -1,15 +1,12 @@
 import { DiscoveredPage, CrawlResult, DiscoverOptions, DiscoverResponse, CrawlRequest, CrawlResponse } from './types' // Added new types
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:24125'; // Use env variable
-console.log(`Using backend URL: ${BACKEND_URL}`);
 
 export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): Promise<DiscoverResponse> { // Updated return type
   try {
-    // Make a direct request to the backend API instead of going through the Next.js API route
-    console.log('Making direct request to backend:', `${BACKEND_URL}/api/discover`)
+    console.log('Making request to Next.js API route: /api/discover')
     console.log('Request payload:', { url, depth })
 
-    const response = await fetch(`${BACKEND_URL}/api/discover`, {
+    const response = await fetch(`/api/discover`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -33,6 +30,7 @@ export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): P
     }
 
     console.log('Discovery initiated with job ID:', data.job_id)
+    // Note: DiscoverResponse uses jobId, but backend returns job_id. Adjusting here.
     return { jobId: data.job_id } // Return the job ID
   } catch (error) {
     console.error('Error discovering subdomains:', error)
@@ -41,18 +39,19 @@ export async function discoverSubdomains({ url, depth = 3 }: DiscoverOptions): P
   }
 }
 
-export async function crawlPages({ pages, jobId }: CrawlRequest): Promise<CrawlResponse> { // Accept jobId, updated return type
+// Corrected function signature and internal variable usage
+export async function crawlPages({ pages, job_id }: CrawlRequest): Promise<CrawlResponse> { // Accept job_id
   try {
-    console.log('Making request to backend for crawling:', pages.length, 'pages')
-    console.log('Request payload:', { pages, job_id: jobId }) // Include job_id
+    console.log('Making request to Next.js API route: /api/crawl');
+    console.log('Request payload:', { pages, job_id: job_id }); // Use job_id
 
-    const response = await fetch(`${BACKEND_URL}/api/crawl`, {
+    const response = await fetch('/api/crawl', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pages, job_id: jobId }), // Send job_id
-    })
+      body: JSON.stringify({ pages, job_id: job_id }), // Use job_id
+    });
 
     console.log('Crawl response status:', response.status)
     const data = await response.json()
@@ -70,14 +69,15 @@ export async function crawlPages({ pages, jobId }: CrawlRequest): Promise<CrawlR
     }
 
     console.log(`Crawl initiated acknowledgment for job ${data.job_id}:`, data.success)
-    return { success: data.success, jobId: data.job_id } // Return acknowledgment
+    // Return acknowledgment using jobId property name as defined in CrawlResponse
+    return { success: data.success, jobId: data.job_id }
 
   } catch (error) {
     console.error('Error initiating crawl:', error)
     // Return a failure acknowledgment
     return {
         success: false,
-        jobId: jobId, // Return the original job ID if available
+        jobId: job_id, // Use job_id variable, return as jobId property
         error: error instanceof Error ? error.message : 'Unknown error occurred while initiating crawl'
     }
   }

@@ -17,11 +17,11 @@ export async function POST(request: Request) {
     console.log('Making discover request for URL:', url, 'with depth:', validatedDepth)
     
     // Make a direct request to the backend API instead of using the discoverSubdomains function
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:24125'
-    console.log('Using backend URL:', backendUrl)
+    const INTERNAL_BACKEND_URL = process.env.BACKEND_URL || 'http://backend:24125';
+    console.log('Using internal backend URL:', INTERNAL_BACKEND_URL);
     
-    console.log('Sending request to backend API:', `${backendUrl}/api/discover`)
-    const response = await fetch(`${backendUrl}/api/discover`, {
+    console.log('Sending request to backend API:', `${INTERNAL_BACKEND_URL}/api/discover`);
+    const response = await fetch(`${INTERNAL_BACKEND_URL}/api/discover`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,10 +50,8 @@ export async function POST(request: Request) {
     }
 
     // Even if we get an empty array, we should still return it with a 200 status
-    return NextResponse.json({
-      pages: data.pages || [],
-      message: data.message || (data.pages?.length === 0 ? 'No pages discovered' : `Found ${data.pages?.length} pages`)
-    })
+    // Forward the exact response from the backend, including the job_id
+    return NextResponse.json(data)
     
   } catch (error) {
     console.error('Error in discover route:', error)

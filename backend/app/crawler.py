@@ -222,7 +222,7 @@ async def discover_pages(
                 await asyncio.sleep(poll_interval) # Use await for asyncio.sleep
                 logger.debug(f"Polling link discovery task {task_id} (attempt {attempt+1}/{max_attempts})")
                 status_response = requests.get(
-                    poll_url,
+                    f"{CRAWL4AI_URL}/task/{task_id}",
                     headers=headers,
                     timeout=10
                 )

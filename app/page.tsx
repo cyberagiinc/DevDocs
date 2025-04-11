@@ -18,12 +18,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"; // Import Dialog components
-import { Info } from 'lucide-react'; // Import an icon for the trigger
+import { Info, Settings } from 'lucide-react'; // Import icons
 import { discoverSubdomains, crawlPages, validateUrl, formatBytes } from '@/lib/crawl-service'
 import { saveMarkdown, loadMarkdown } from '@/lib/storage'
 import { useToast } from "@/components/ui/use-toast"
 import { DiscoveredPage, CrawlJobStatus, OverallStatus, UrlStatus } from '@/lib/types' // Import status types & UrlStatus
-import ConsolidatedFiles from '@/components/ConsolidatedFiles' // Import ConsolidatedFiles
+import ConsolidatedFiles from '@/components/ConsolidatedFiles'; // Import ConsolidatedFiles
+import { MCPSettingsPopover } from '@/components/MCPSettingsPopover'; // Import MCP Settings Popover (Named Export)
 
 export default function Home() {
   const [url, setUrl] = useState('')
@@ -161,7 +162,7 @@ const handleCrawlSelectedClick = async () => {
       // setDiscoveredPages(...)
       
       // Call updated service function, passing job ID
-      const crawlResponse = await crawlPages({ pages: pagesToCrawl, jobId: currentJobId })
+      const crawlResponse = await crawlPages({ pages: pagesToCrawl, job_id: currentJobId }) // Changed jobId to job_id
       console.log('Crawl initiation response:', crawlResponse)
 
       if (!crawlResponse.success || crawlResponse.error) {
@@ -265,7 +266,6 @@ const handleCrawlSelectedClick = async () => {
     let intervalId: NodeJS.Timeout | null = null;
     let isFetching = false; // Prevent overlapping fetches
     const POLLING_INTERVAL = 3000; // Poll every 3 seconds
-    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:24125';
 
 
     const fetchStatus = async () => {
@@ -275,7 +275,7 @@ const handleCrawlSelectedClick = async () => {
 
       try {
         console.log(`(Page) Fetching status for job: ${currentJobId}`);
-        const response = await fetch(`${BACKEND_URL}/api/crawl-status/${currentJobId}`);
+        const response = await fetch(`/api/crawl-status/${currentJobId}`);
         const data: CrawlJobStatus = await response.json();
 
         if (!response.ok) {
@@ -346,11 +346,18 @@ const handleCrawlSelectedClick = async () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-6">
+        {/* Container for Job Stats and Settings Button */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">
-          {/* Replace ProcessingBlock with JobStatsSummary */}
-          {/* <h2 className="text-2xl font-semibold mb-4 text-purple-400">Processing Status</h2> */}
-          {/* The title is now inside JobStatsSummary */}
-          <JobStatsSummary jobStatus={jobStatus} />
+          <div className="flex justify-between items-start"> {/* Flex container - Align items to top */}
+            {/* JobStatsSummary remains here */}
+            <JobStatsSummary jobStatus={jobStatus} />
+            {/* MCP Settings Popover Trigger */}
+            <MCPSettingsPopover>
+              <Button variant="outline" size="icon" aria-label="MCP Settings" className="bg-white text-black hover:bg-gray-100 hover:text-black">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </MCPSettingsPopover>
+          </div>
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 border border-gray-700 shadow-xl">

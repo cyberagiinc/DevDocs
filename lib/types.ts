@@ -73,7 +73,7 @@ export interface CrawlJobStatus {
 
 // Response type for the updated discoverSubdomains service function
 export interface DiscoverResponse {
-  jobId: string;
+  jobId: string; // Note: This might need changing to job_id if backend expects snake_case here too
   // success?: boolean; // Backend currently returns success, might be useful
   // message?: string; // Backend currently returns message
 }
@@ -81,13 +81,13 @@ export interface DiscoverResponse {
 // Request type for the updated crawlPages service function
 export interface CrawlRequest {
   pages: DiscoveredPage[];
-  jobId: string;
+  job_id: string; // Corrected from jobId to job_id
 }
 
 // Response type for the updated crawlPages service function
 export interface CrawlResponse {
   success: boolean;
-  jobId: string;
+  jobId: string; // Note: This might need changing to job_id if backend expects snake_case here too
   error?: string; // Include optional error message
   // message?: string; // Backend currently returns message
 }
@@ -99,5 +99,28 @@ export interface CrawlUrlsProps {
   onSelectionChange: (newSelectedUrls: Set<string>) => void;
   onCrawlSelected: () => void;
   isCrawlingSelected: boolean;
-  jobId: string | null;
+  jobId: string | null; // Note: This might need changing to job_id if backend expects snake_case here too
+}
+
+// --- Types for MCP Settings ---
+
+export interface MCPServerInfo {
+  host: string;
+  port: number;
+  disabled: boolean;
+  containerized: boolean;
+  // Add other potential fields if needed in the future
+}
+
+export interface MCPConfig {
+  mcpServers: {
+    [serverName: string]: MCPServerInfo;
+  };
+}
+
+export type MCPStatusCode = 'running' | 'stopped' | 'error' | 'unknown'; // Added 'unknown' for initial/default state
+
+export interface MCPStatus {
+  status: MCPStatusCode;
+  details?: string | null;
 }

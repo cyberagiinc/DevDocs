@@ -1,18 +1,19 @@
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Path as FastApiPath
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Path as FastApiPath, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, Field, validator # Removed Dict import
-from typing import List, Optional, Dict # Import Dict from typing if needed elsewhere, or just use dict
+from fastapi.responses import PlainTextResponse, JSONResponse
+from pydantic import BaseModel, Field, validator
+from typing import List, Optional, Dict
 import uvicorn
 import logging
+import datetime # Keep one datetime import
+import json # Keep one json import
 import psutil
 import os
 import requests
-import json
 import uuid
 import asyncio
 from pathlib import Path
-from datetime import datetime
+# Removed duplicate datetime import from line 17
 from .crawler import discover_pages, crawl_pages, DiscoveredPage, CrawlResult, url_to_filename
 
 # Configure logging
@@ -48,6 +49,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware to log requests for the removed /api/memory-files endpoint
+@app.middleware("http")
+async def log_stale_memory_files_requests(request: Request, call_next):
+    """
+    Intercepts requests specifically for the removed /api/memory-files path
+    and logs detailed information before allowing FastAPI to return a 404.
+    """
+    if request.url.path == "/api/memory-files":
+        # Use the imported datetime module directly
+        timestamp = datetime.datetime.now().isoformat()
+        log_details = {
+            "timestamp": timestamp,
+            "method": request.method,
+            "path": request.url.path,
+            "query": request.url.query,
+            "client_host": request.client.host if request.client else "N/A",
+            "user_agent": request.headers.get('user-agent', 'N/A'),
+            "referer": request.headers.get('referer', 'N/A'),
+        }
+        # Use warning level as these are requests for a non-existent endpoint
+        # Use the imported json module directly
+        logger.warning(f"Stale request detected for /api/memory-files: {json.dumps(log_details)}")
+
+    # Proceed with the request processing. FastAPI will handle the 404 eventually.
+    response = await call_next(request)
+    return response
 
 class DiscoverRequest(BaseModel):
     url: str
@@ -121,23 +149,23 @@ async def get_mcp_status():
     """Check if the MCP server is running by making a direct request to the MCP container"""
     try:
         logger.info("Checking MCP server status")
-        
+
         # Get MCP host from environment variable or use default container name
         mcp_host = os.environ.get("MCP_HOST", "mcp")
         logger.info(f"Using MCP host: {mcp_host}")
-        
+
         # Try to connect to the MCP server
         try:
             # Since the MCP server doesn't have a health endpoint, we'll check if the container is reachable
             import socket
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(2)
-            
+
             # Try to resolve the hostname
             try:
                 socket.gethostbyname(mcp_host)
                 logger.info(f"Successfully resolved MCP host: {mcp_host}")
-                
+
                 # We can't actually connect to a port since MCP doesn't expose one,
                 # but if we can resolve the hostname, we'll assume it's running
                 logger.info("MCP server is operational (container is reachable)")
@@ -153,7 +181,7 @@ async def get_mcp_status():
                 }
         except Exception as e:
             logger.warning(f"Failed to connect to MCP server: {str(e)}")
-            
+
             # Fallback: Check if logs exist
             log_path = Path("logs/mcp.log")
             if log_path.exists():
@@ -162,7 +190,7 @@ async def get_mcp_status():
                     "status": "running",
                     "details": "MCP server is assumed to be running (log file exists)"
                 }
-            
+
             return {
                 "status": "stopped",
                 "details": f"Failed to connect: {str(e)}"
@@ -180,7 +208,7 @@ async def get_crawl4ai_status():
     try:
         logger.info("Checking Crawl4AI service status")
         crawl4ai_url = os.environ.get("CRAWL4AI_URL", "http://crawl4ai:11235")
-        
+
         try:
             response = requests.get(f"{crawl4ai_url}/health", timeout=5)
             if response.status_code == 200:
@@ -215,15 +243,15 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
         logger.info(f"Testing Crawl4AI service with URL: {request.url}")
         crawl4ai_url = os.environ.get("CRAWL4AI_URL", "http://crawl4ai:11235")
         api_token = os.environ.get("CRAWL4AI_API_TOKEN", "devdocs-demo-key")
-        
+
         # Set up headers for authentication
         headers = {"Authorization": f"Bearer {api_token}"}
-        
+
         # Submit crawl job to Crawl4AI
         try:
             response = requests.post(
-                f"{crawl4ai_url}/crawl", 
-                headers=headers, 
+                f"{crawl4ai_url}/crawl",
+                headers=headers,
                 json={
                     "urls": request.url,
                     "priority": 10
@@ -233,7 +261,7 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
             response.raise_for_status()
             task_id = response.json()["task_id"]
             logger.info(f"Submitted crawl job for {request.url}, task ID: {task_id}")
-            
+
             # Poll for result
             max_attempts = 30
             poll_interval = 1
@@ -241,48 +269,48 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
                 logger.info(f"Polling for task {task_id} result (attempt {attempt+1}/{max_attempts})")
                 try:
                     status_response = requests.get(
-                        f"{crawl4ai_url}/task/{task_id}", 
+                        f"{crawl4ai_url}/task/{task_id}",
                         headers=headers,
                         timeout=10
                     )
                     status_response.raise_for_status()
                     status = status_response.json()
-                    
+
                     logger.info(f"Task {task_id} status: {status['status']}")
-                    
+
                     if status["status"] == "completed":
                         result = status["result"]
                         logger.info(f"Task {task_id} completed successfully")
-                        
+
                         # Save the result to a file if requested
                         if request.save_results:
                             # Ensure storage/markdown directory exists
                             os.makedirs("storage/markdown", exist_ok=True)
-                            
+
                             # Note: We're now redirecting files from crawl_results to storage/markdown
                             logger.info(f"Files will be redirected from crawl_results to storage/markdown")
-                            
+
                             # Generate a human-readable filename based on the URL
                             url_hash = url_to_filename(request.url)
-                            
+
                             # We no longer save individual files, only consolidated ones
                             logger.info(f"Skipping individual file creation for task {task_id} - using consolidated approach only")
-                            
+
                             # Extract the markdown content if available
                             if "markdown" in result and result["markdown"]:
                                 # Log that we're skipping individual file creation
                                 logger.info(f"Skipping individual markdown file for task {task_id} - using consolidated approach only")
-                                
+
                                 # For the consolidated file, we'll append to the root file
                                 storage_file = f"storage/markdown/{url_hash}.md"
                                 os.makedirs("storage/markdown", exist_ok=True)
-                                
+
                                 # Create a section header for this page
                                 page_section = f"\n\n## {result.get('title', 'Untitled Page')}\n"
                                 page_section += f"URL: {request.url}\n\n"
                                 page_section += result["markdown"]
                                 page_section += "\n\n---\n\n"
-                                
+
                                 # If this is the first write to the file, add a header
                                 if not os.path.exists(storage_file):
                                     header = f"# Consolidated Documentation for {request.url}\n\n"
@@ -290,16 +318,16 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
                                     header += f"Each section represents a different page that was crawled.\n\n"
                                     header += "---\n"
                                     page_section = header + page_section
-                                
+
                                 # Append to the file if it exists, otherwise create it
                                 mode = 'a' if os.path.exists(storage_file) else 'w'
                                 with open(storage_file, mode) as f:
                                     f.write(page_section)
                                 logger.info(f"{'Appended to' if mode == 'a' else 'Created'} consolidated markdown file: {storage_file}")
-                                
+
                                 # Update the metadata file with this page's info
                                 metadata_file = f"storage/markdown/{url_hash}.json"
-                                
+
                                 # Read existing metadata if it exists
                                 metadata = {}
                                 if os.path.exists(metadata_file):
@@ -308,34 +336,34 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
                                             metadata = json.load(f)
                                     except json.JSONDecodeError:
                                         logger.error(f"Error reading metadata file: {metadata_file}")
-                                
+
                                 # Initialize or update the pages list
                                 if "pages" not in metadata:
                                     metadata = {
                                         "title": f"Documentation for {request.url}",
                                         "root_url": request.url,
-                                        "timestamp": datetime.now().isoformat(),
+                                        "timestamp": datetime.datetime.now().isoformat(), # Use datetime.datetime
                                         "pages": [],
                                         "is_consolidated": True
                                     }
-                                
+
                                 # Add this page to the pages list
                                 metadata["pages"].append({
                                     "title": result.get("title", "Untitled"),
                                     "url": request.url,
-                                    "timestamp": datetime.now().isoformat(),
+                                    "timestamp": datetime.datetime.now().isoformat(), # Use datetime.datetime
                                     "internal_links": len(result.get("links", {}).get("internal", [])),
                                     "external_links": len(result.get("links", {}).get("external", []))
                                 })
-                                
+
                                 # Update the last_updated timestamp
-                                metadata["last_updated"] = datetime.now().isoformat()
-                                
+                                metadata["last_updated"] = datetime.datetime.now().isoformat() # Use datetime.datetime
+
                                 # Write the updated metadata
                                 with open(metadata_file, 'w') as f:
                                     json.dump(metadata, f, indent=2)
                                 logger.info(f"Updated metadata in {metadata_file}")
-                        
+
                         return {
                             "success": True,
                             "task_id": task_id,
@@ -358,13 +386,13 @@ async def test_crawl4ai(request: TestCrawl4AIRequest):
                             "status": "failed",
                             "error": status.get("error", "Unknown error")
                         }
-                    
+
                     # Wait before polling again
                     await asyncio.sleep(poll_interval)
                 except Exception as e:
                     logger.error(f"Error polling task {task_id}: {str(e)}")
                     await asyncio.sleep(poll_interval)
-            
+
             # If we get here, the task timed out
             logger.warning(f"Timeout waiting for task {task_id} result")
             return {
@@ -449,11 +477,11 @@ async def get_mcp_logs():
         if not log_path.exists():
             logger.info("No log file found")
             return {"logs": []}
-        
+
         with open(log_path, 'r') as f:
             # Get last 50 lines but skip empty lines
             logs = [line.strip() for line in f.readlines() if line.strip()][-50:]
-        
+
         logger.info(f"Retrieved {len(logs)} log lines")
         return {"logs": logs}
     except Exception as e:
@@ -482,8 +510,9 @@ async def discover_endpoint(request: DiscoverRequest, background_tasks: Backgrou
             "job_id": job_id,
             "success": True
         }
-        logger.info(f"Returning response with {len(response_data['pages'])} pages")
-        return response_data
+        # This part seems unreachable now, removing
+        # logger.info(f"Returning response with {len(response_data['pages'])} pages")
+        # return response_data
     except Exception as e:
         logger.error(f"Error initiating discovery for {request.url}: {str(e)}", exc_info=True)
         # Return a structured error response immediately if initiation fails
