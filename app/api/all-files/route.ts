@@ -22,99 +22,99 @@ interface FileDetails {
 export async function GET(request: Request) {
   console.log('[API] /api/all-files route called at', new Date().toISOString());
   try {
-    // Only get .md files
-    const files = await fs.readdir(STORAGE_DIR)
-    const mdFiles = files.filter(f => f.endsWith('.md'))
-    const jsonFiles = files.filter(f => f.endsWith('.json'))
-    
-    // Get disk files
-    const diskFileDetails = await Promise.all(
-      mdFiles.map(async (filename) => {
-        const mdPath = path.join(STORAGE_DIR, filename)
-        const jsonPath = path.join(STORAGE_DIR, filename.replace('.md', '.json'))
-        const stats = await fs.stat(mdPath)
-        const content = await fs.readFile(mdPath, 'utf-8')
-        
-        // Check if this is a consolidated file by examining the JSON metadata
-        let isConsolidated = false
-        let pagesCount = 0
-        let rootUrl = ''
-        
-        if (jsonFiles.includes(filename.replace('.md', '.json'))) {
-          try {
-            const jsonContent = await fs.readFile(jsonPath, 'utf-8')
-            const metadata = JSON.parse(jsonContent)
-            
-            // If the metadata has a "pages" array, it's a consolidated file
-            if (metadata.pages && Array.isArray(metadata.pages)) {
-              isConsolidated = true
-              pagesCount = metadata.pages.length
-              rootUrl = metadata.root_url || ''
-            }
-          } catch (e) {
-            console.error(`Error reading JSON metadata for ${filename}:`, e)
+    // Read all files from the storage directory
+    const files = await fs.readdir(STORAGE_DIR);
+    const mdFiles = files.filter(f => f.endsWith('.md'));
+    // Create a Set of existing JSON filenames for efficient lookup
+    const jsonFileSet = new Set(files.filter(f => f.endsWith('.json')));
+
+    // Process only .md files that have a corresponding .json file
+    const fileDetailsPromises = mdFiles.map(async (mdFilename): Promise<FileDetails | null> => {
+      const baseName = mdFilename.replace('.md', '');
+      const jsonFilename = `${baseName}.json`;
+      const mdPath = path.join(STORAGE_DIR, mdFilename);
+      const jsonPath = path.join(STORAGE_DIR, jsonFilename);
+
+      // Check if the corresponding JSON file exists
+      if (!jsonFileSet.has(jsonFilename)) {
+        console.warn(`[API /api/all-files] Skipping MD file '${mdFilename}' because corresponding JSON file '${jsonFilename}' does not exist.`);
+        return null; // Skip this file
+      }
+
+      try {
+        // Get stats for the MD file
+        const stats = await fs.stat(mdPath);
+        // Read MD content (needed for word/char count, maybe fallback page count)
+        const mdContent = await fs.readFile(mdPath, 'utf-8');
+
+        // Read JSON metadata
+        let isConsolidated = false;
+        let pagesCount = 0;
+        let rootUrl = '';
+        let metadata: any = {}; // Initialize metadata
+
+        try {
+          const jsonContent = await fs.readFile(jsonPath, 'utf-8');
+          metadata = JSON.parse(jsonContent);
+
+          // Determine consolidation status and page count from JSON
+          if (metadata.pages && Array.isArray(metadata.pages)) {
+            isConsolidated = true;
+            pagesCount = metadata.pages.length;
+            rootUrl = metadata.root_url || '';
+          } else if (metadata.is_consolidated === true) {
+             // Fallback check if 'is_consolidated' flag exists but 'pages' array doesn't (maybe older format?)
+             isConsolidated = true;
+             rootUrl = metadata.root_url || '';
+             // Attempt to count pages from MD content as a fallback
+             const sectionMatches = mdContent.match(/## .+\nURL: .+/g);
+             pagesCount = sectionMatches ? sectionMatches.length : 0; // Default to 0 if no sections found
           }
-        } else {
-          // Create JSON file if it doesn't exist
-          const jsonContent = JSON.stringify({
-            content,
-            metadata: {
-              wordCount: content.split(/\s+/).length,
-              charCount: content.length,
-              timestamp: stats.mtime
-            }
-          }, null, 2)
-          await fs.writeFile(jsonPath, jsonContent, 'utf-8')
+
+        } catch (jsonError) {
+          console.error(`[API /api/all-files] Error reading or parsing JSON metadata for ${jsonFilename}:`, jsonError);
+          // Decide how to handle JSON errors: skip the file or return partial data?
+          // For now, let's skip it to ensure data integrity in the list.
+          return null;
         }
-        
-        // Extract sections to count how many pages are included
-        if (!pagesCount && isConsolidated) {
-          // Count sections that start with "## " and have a URL: line after them
-          const sectionMatches = content.match(/## .+\nURL: .+/g)
-          pagesCount = sectionMatches ? sectionMatches.length : 0
-        }
-        
+
+        // Calculate word/char count from MD content
+        const wordCount = mdContent.split(/\s+/).filter(Boolean).length; // More robust word count
+        const charCount = mdContent.length;
+
         return {
-          name: filename.replace('.md', ''),
+          name: baseName,
           jsonPath,
           markdownPath: mdPath,
-          timestamp: stats.mtime,
-          size: stats.size,
-          wordCount: content.split(/\s+/).length,
-          charCount: content.length,
+          timestamp: stats.mtime, // Use MD file modification time as primary timestamp
+          size: stats.size, // Use MD file size
+          wordCount: wordCount,
+          charCount: charCount,
           isConsolidated,
-          pagesCount: isConsolidated ? pagesCount : 1,
-          rootUrl: rootUrl || '',
-          isInMemory: false
-        }
-      })
-    )
-    
-    // Define interface for in-memory file
-    interface MemoryFile {
-      name: string;
-      path: string;
-      timestamp: string;
-      size: number;
-      wordCount: number;
-      charCount: number;
-      isInMemory: boolean;
-      isJson: boolean;
-      metadata?: any;
-    }
-    
-    // Removed fetch for /api/memory-files as the endpoint no longer exists in the backend.
-    // The concept of separate "memory files" fetched via API is deprecated.
-    // The 'memoryFiles' array remains empty, and the route now only lists files from disk.
-    const memoryFiles: FileDetails[] = [] // Explicitly type the empty array
-    
-    // Combine disk and memory files - return ALL files, not just consolidated ones
-    const allFiles = [...diskFileDetails, ...memoryFiles]
-    
+          pagesCount: isConsolidated ? pagesCount : 1, // Ensure non-consolidated files show 1 page
+          rootUrl: rootUrl,
+          isInMemory: false // Always false now
+        };
+      } catch (fileError) {
+        console.error(`[API /api/all-files] Error processing file pair (${mdFilename}, ${jsonFilename}):`, fileError);
+        return null; // Skip file pair if any error occurs during processing
+      }
+    });
+
+    // Wait for all promises to resolve and filter out null values (skipped files)
+    const diskFileDetails = (await Promise.all(fileDetailsPromises)).filter((details): details is FileDetails => details !== null);
+
+    // Memory files are deprecated
+    const memoryFiles: FileDetails[] = [];
+
+    // Combine results (memoryFiles is always empty now)
+    const allFiles = [...diskFileDetails, ...memoryFiles];
+
+    console.log(`[API /api/all-files] Returning details for ${allFiles.length} file(s).`);
     return NextResponse.json({
       success: true,
       files: allFiles
-    })
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to load files' },

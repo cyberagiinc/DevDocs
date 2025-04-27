@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CrawlJobStatus, UrlStatus } from '@/lib/types'; // Import necessary types
+import { CrawlJobStatus, UrlStatus, UrlDetails } from '@/lib/types'; // Import necessary types, including UrlDetails
 import { Globe, BookOpen, HardDrive, AlertTriangle } from 'lucide-react'; // Example icons
 
 // Placeholder for metadata structure - might be needed for Data Extracted size
@@ -18,10 +18,12 @@ interface JobStatsSummaryProps {
 }
 
 // Helper function to count URLs by status
-const countUrlsByStatus = (urls: Record<string, UrlStatus> | undefined, targetStatus: UrlStatus | UrlStatus[]): number => {
+// Helper function to count URLs by status (using UrlDetails)
+const countUrlsByStatus = (urls: Record<string, UrlDetails> | undefined, targetStatus: UrlStatus | UrlStatus[]): number => {
   if (!urls) return 0;
   const targetStatuses = Array.isArray(targetStatus) ? targetStatus : [targetStatus];
-  return Object.values(urls).filter(status => targetStatuses.includes(status)).length;
+  // Correctly access the 'status' property within the UrlDetails object
+  return Object.values(urls).filter(details => targetStatuses.includes(details.status)).length;
 };
 
 const JobStatsSummary: React.FC<JobStatsSummaryProps> = ({
