@@ -29,6 +29,13 @@ fi
 # Start Docker containers
 echo -e "${BLUE}Starting Docker containers...${NC}"
 echo -e "${BLUE}Building Docker images to include latest code changes...${NC}"
+echo -e "${BLUE}Pulling specific Crawl4AI image (unclecode/crawl4ai:0.6.0-r1)...${NC}"
+docker pull unclecode/crawl4ai:0.6.0-r1
+# Check if the pull command was successful
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: Failed to pull Docker image unclecode/crawl4ai:0.6.0-r1. Please check your internet connection and Docker Hub access.${NC}"
+    exit 1 # Exit the script if pull fails
+fi
 $DOCKER_COMPOSE up -d --build
 echo -e "${GREEN}All services are running!${NC}"
 echo -e "${BLUE}Frontend:${NC} http://localhost:3001"

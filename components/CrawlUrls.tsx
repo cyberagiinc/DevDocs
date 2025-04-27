@@ -18,7 +18,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"; // Assuming tooltip is here
-import { CrawlUrlsProps, UrlStatus } from '@/lib/types'; // Import props and status type
+import { CrawlUrlsProps, UrlStatus, OverallStatus, UrlDetails } from '@/lib/types'; // Import props and status types
+import { Ban } from 'lucide-react'; // Import Ban icon for cancel button
 
 // Helper function to map status to badge variant AND apply custom styles
 // Returns an object { variant, className }
@@ -74,13 +75,22 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
   onSelectionChange,
   onCrawlSelected,
   isCrawlingSelected,
-  jobId // Keep jobId for context if needed later
+  jobId, // Keep jobId for context if needed later
+  // Added props for cancellation
+  onCancelCrawl,
+  overallStatus,
+  isCancelling
 }) => {
 
   // Log prop changes for debugging
   useEffect(() => {
-    console.log('[CrawlUrls] Props updated:', { jobId, urlsCount: Object.keys(urls).length, selectedCount: selectedUrls.size, isCrawlingSelected });
-  }, [urls, selectedUrls, isCrawlingSelected, jobId]);
+    console.log('[CrawlUrls] Props updated:', { jobId, urlsCount: Object.keys(urls).length, selectedCount: selectedUrls.size, isCrawlingSelected, overallStatus, isCancelling });
+    // Add specific check here
+    const shouldShow = jobId && overallStatus && ['discovering', 'crawling', 'cancelling'].includes(overallStatus);
+    console.log(`[CrawlUrls] Effect Check: Status is '${overallStatus}', shouldShow is ${shouldShow}`);
+    // The console.log below is already commented out from the previous step
+    // console.log(`[CrawlUrls] Effect Check: Status is '${overallStatus}', shouldShow is ${shouldShow}`); // Keep commented out for now
+  }, [urls, selectedUrls, isCrawlingSelected, jobId, overallStatus, isCancelling]);
 
   // Memoize the list of URLs to render and filter pending ones
   const urlEntries = useMemo(() => {
@@ -91,16 +101,24 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
   }, [urls]);
 
   const pendingUrls = useMemo(() => {
-    return urlEntries.filter(([_, status]) => status === 'pending_crawl').map(([url]) => url);
+    // Filter based on the 'status' property of the UrlDetails object
+    return urlEntries.filter(([_, details]) => details.status === 'pending_crawl').map(([url]) => url);
   }, [urlEntries]);
 
   const selectedPendingCount = useMemo(() => {
+    // --- DEBUGGING: Log inputs for selectedPendingCount ---
+    console.log('[CrawlUrls] Calculating selectedPendingCount. selectedUrls:', selectedUrls, 'urls object keys:', Object.keys(urls));
     let count = 0;
     selectedUrls.forEach(url => {
-      if (urls[url] === 'pending_crawl') {
-        count++;
+      const urlDetails = urls[url];
+      // Access the status property safely
+      if (urlDetails?.status === 'pending_crawl') {
+         // console.log(`[CrawlUrls] Counting selected pending URL: ${url}`); // Optional: Log each counted URL
+         count++;
       }
     });
+    console.log(`[CrawlUrls] Calculated selectedPendingCount: ${count}`);
+    // --- END DEBUGGING ---
     return count;
   }, [selectedUrls, urls]);
 
@@ -142,6 +160,14 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
   const isSomePendingSelected = pendingUrls.some(url => selectedUrls.has(url));
   const selectAllState = isAllPendingSelected ? true : (isSomePendingSelected ? 'indeterminate' : false);
 
+  // Determine if the cancel button should be shown and enabled
+  const canCancel = overallStatus === 'discovering' || overallStatus === 'crawling';
+  // const showCancelButton = selectedPendingCount > 0; // Removed - Visibility now depends only on canCancel
+
+  // --- Debug Log for Cancel Button ---
+  // console.log('[CrawlUrls] Cancel Button Check:', { jobId, overallStatus, isCancelling, showCancelButton }); // Keep commented out for now
+  // --- End Debug Log ---
+
   // --- Render ---
   if (urlEntries.length === 0) {
     return <p className="text-gray-500 italic text-center py-4">No URLs discovered yet for this job.</p>;
@@ -169,14 +195,40 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
              </label>
            </div>
         )}
-        {/* Crawl Selected Button */}
-        <Button
-          onClick={handleCrawlClick}
-          disabled={isCrawlingSelected || selectedPendingCount === 0}
-          size="sm"
-        >
-          {isCrawlingSelected ? 'Initiating...' : `Crawl Selected (${selectedPendingCount})`}
-        </Button>
+        {/* Action Buttons Container */}
+        <div className="flex items-center space-x-2">
+          {/* Crawl Selected Button */}
+          <Button
+            onClick={handleCrawlClick}
+            disabled={isCrawlingSelected || selectedPendingCount === 0 || isCancelling} // Removed !canCancel check
+            size="sm"
+            aria-label={`Crawl ${selectedPendingCount} selected URLs`}
+          >
+            {isCrawlingSelected ? 'Initiating...' : `Crawl Selected (${selectedPendingCount})`}
+          </Button>
+{/* Cancel Crawl Button */}
+{canCancel && ( // Changed condition from showCancelButton to canCancel
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="destructive" // Red color
+                    onClick={onCancelCrawl}
+                    disabled={isCancelling || !canCancel} // Disable if already cancelling or not in cancellable state
+                    size="sm"
+                    aria-label="Cancel current crawl job"
+                  >
+                    <Ban className="mr-2 h-4 w-4" /> {/* Icon */}
+                    {isCancelling ? 'Cancelling...' : 'Cancel Crawl'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-black text-white">
+                  <p>Request cancellation of the current crawl job.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
 
       <div className="rounded-md border border-gray-700 max-h-96 overflow-y-auto">
@@ -185,12 +237,16 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
             <TableRow>
               <TableHead className="w-[50px] text-white">Select</TableHead>
               <TableHead className="text-white">URL</TableHead>
+              {/* Add new header for Status Code */}
+              <TableHead className="w-[80px] text-center text-white">Code</TableHead>
               <TableHead className="w-[150px] text-center text-white">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {urlEntries.map(([url, status]) => {
-              const isPending = status === 'pending_crawl';
+            {/* Update map function to destructure UrlDetails */}
+            {urlEntries.map(([url, details]) => {
+              // Check status from the details object
+              const isPending = details.status === 'pending_crawl';
               return (
                 <TableRow key={url}>
                   <TableCell className="text-center">
@@ -222,21 +278,30 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
                        </Tooltip>
                      </TooltipProvider>
                   </TableCell>
+                  {/* Add new cell for Status Code */}
+                  <TableCell className="text-center text-white">
+                    {/* Display statusCode or '-' if null/undefined */}
+                    {details.statusCode ?? '-'}
+                  </TableCell>
                   <TableCell className="text-center">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
                           {(() => { // Immediately invoked function to get style object
-                            const { variant, className } = getStatusBadgeStyle(status as UrlStatus);
+                            // Use status from details object
+                            const { variant, className } = getStatusBadgeStyle(details.status);
                             return (
                               <Badge variant={variant} className={className}>
-                                {status.replace(/_/g, ' ')} {/* Basic formatting */}
+                                {/* Use status from details object */}
+                                {/* Use status from details object, add optional chaining and fallback */}
+                                {details.status?.replace(/_/g, ' ') ?? 'unknown'}
                               </Badge>
                             );
                           })()}
                         </TooltipTrigger>
                         <TooltipContent className="bg-black text-white"> {/* Black bg, white text */}
-                          <p>{getStatusTooltip(status as UrlStatus)}</p>
+                           {/* Use status from details object */}
+                          <p>{getStatusTooltip(details.status)}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

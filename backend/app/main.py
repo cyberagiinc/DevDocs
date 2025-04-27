@@ -31,7 +31,10 @@ from .status_manager import (
     update_overall_status,
     update_url_status, # We might need this later in crawler.py
     add_pending_crawl_urls,
-    get_job_status
+    get_job_status,
+    request_cancellation, # Added for kill switch
+    JobNotFoundException, # Added for kill switch error handling
+    JobStatusException    # Added for kill switch error handling
 )
 # Removed redundant app assignment
 
@@ -575,6 +578,40 @@ async def get_crawl_status(job_id: str = FastApiPath(..., title="Job ID", descri
     logger.debug(f"Returning status for job ID {job_id}: {job_status.overall_status}")
     return job_status
 
+
+# --- NEW ENDPOINT START ---
+@app.post("/api/crawl-cancel/{job_id}")
+async def cancel_crawl_job(job_id: str = FastApiPath(..., title="Job ID", description="The unique ID of the crawl job to cancel")):
+    """Requests cancellation of an ongoing crawl job."""
+    logger.info(f"Received cancellation request for job ID: {job_id}")
+    try:
+        # Call the status manager to request cancellation
+        # This function should handle idempotency internally (return True if already cancelling/cancelled)
+        # and raise specific exceptions for errors.
+        success = request_cancellation(job_id)
+
+        if success:
+            logger.info(f"Cancellation successfully requested for job ID: {job_id}")
+            return {"message": f"Cancellation request received for job {job_id}"}
+        else:
+            # This case implies request_cancellation returned False without raising an exception.
+            # This *shouldn't* happen if exceptions are used correctly for failure modes,
+            # but we handle it defensively.
+            logger.warning(f"Cancellation request for job ID {job_id} returned False unexpectedly.")
+            raise HTTPException(status_code=500, detail="Failed to initiate cancellation due to an unexpected internal condition.")
+
+    except JobNotFoundException: # Specific exception from status_manager
+        logger.warning(f"Cancellation requested for unknown or completed/failed job ID: {job_id}")
+        # Return 404 as the job isn't active or doesn't exist for cancellation purposes
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found or already in a final state.")
+    except JobStatusException as e: # Specific exception for non-cancellable state (e.g., 'idle')
+         logger.warning(f"Cancellation requested for job ID {job_id} which is not in a cancellable state: {e}")
+         # Use 409 Conflict as the job exists but the operation cannot be performed in the current state
+         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error requesting cancellation for job ID {job_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initiate cancellation due to a server error.")
+# --- NEW ENDPOINT END ---
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",

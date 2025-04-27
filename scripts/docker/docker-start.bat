@@ -42,6 +42,13 @@ icacls crawl_results /grant Everyone:F /T
 :: Start Docker containers
 echo %BLUE%Starting Docker containers...%NC%
 echo %BLUE%Building Docker images to include latest code changes...%NC%
+echo %BLUE%Pulling specific Crawl4AI image (unclecode/crawl4ai:0.6.0-r1)...%NC%
+docker pull unclecode/crawl4ai:0.6.0-r1
+:: Check if the pull command was successful
+if %ERRORLEVEL% neq 0 (
+    echo %RED%Error: Failed to pull Docker image unclecode/crawl4ai:0.6.0-r1. Please check your internet connection and Docker Hub access.%NC%
+    exit /b 1 :: Exit the script if pull fails
+)
 docker-compose up -d --build
 
 echo %GREEN%All services are running!%NC%

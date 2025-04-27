@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react' // Added useCallback
 import UrlInput from '@/components/UrlInput'
 // import ProcessingBlock from '@/components/ProcessingBlock' // Replaced by JobStatsSummary
 import JobStatsSummary from '@/components/JobStatsSummary' // Import the new stats component
@@ -27,27 +27,160 @@ import ConsolidatedFiles from '@/components/ConsolidatedFiles'; // Import Consol
 import { MCPConfigDialog } from '@/components/MCPConfigDialog'; // Import the renamed MCP Config Dialog
 
 export default function Home() {
-  const [url, setUrl] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [discoveredPages, setDiscoveredPages] = useState<DiscoveredPage[]>([])
-  const [isCrawling, setIsCrawling] = useState(false)
+  // --- LocalStorage Persistence Constants (defined earlier) ---
+  const LOCALSTORAGE_VERSION = '1';
+  const localStorageKey = {
+      VERSION: 'crawlAppStateVersion',
+      JOB_ID: 'crawlJobId',
+      JOB_STATUS: 'crawlJobStatus',
+      SELECTED_URLS: 'crawlSelectedUrls',
+      URL_INPUT: 'crawlUrlInput',
+      DISCOVERED_PAGES: 'crawlDiscoveredPages',
+  };
+
+  // --- Helper function for safe localStorage getItem ---
+  const safeLocalStorageGetItem = (key: string, defaultValue: any = null) => {
+      if (typeof window === 'undefined') {
+          return defaultValue;
+      }
+      try {
+          const item = localStorage.getItem(key);
+          if (!item) {
+              return defaultValue;
+          }
+          const parsed = JSON.parse(item);
+          if (parsed.version !== LOCALSTORAGE_VERSION) {
+              console.warn(`LocalStorage version mismatch for key ${key}. Expected ${LOCALSTORAGE_VERSION}, found ${parsed.version}. Discarding stored data.`);
+              localStorage.removeItem(key); // Remove outdated data
+              return defaultValue;
+          }
+          return parsed.data;
+      } catch (error) {
+          console.error(`Error reading state from localStorage (key: ${key}):`, error);
+          localStorage.removeItem(key); // Remove corrupted data
+          return defaultValue;
+      }
+  };
+
+  // --- State Initialization with Hydration ---
+  const [url, setUrl] = useState<string>(() => safeLocalStorageGetItem(localStorageKey.URL_INPUT, ''));
+  const [isProcessing, setIsProcessing] = useState(false); // Transient state, not persisted
+  const [discoveredPages, setDiscoveredPages] = useState<DiscoveredPage[]>(() => safeLocalStorageGetItem(localStorageKey.DISCOVERED_PAGES, []));
+  const [isCrawling, setIsCrawling] = useState(false); // Transient state, not persisted
   const [markdown, setMarkdown] = useState('') // Keep markdown state for potential display elsewhere if needed
   // Remove old stats state, it's now derived in JobStatsSummary from jobStatus
-  // const [stats, setStats] = useState({
-  //   subdomainsParsed: 0,
-  //   pagesCrawled: 0,
-  //   dataExtracted: '0 KB',
-  //   errorsEncountered: 0
-  // })
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null); // Add state for Job ID
-  const { toast } = useToast()
+  // const [stats, setStats] = useState({...}) // Old stats state removed
+  const [currentJobId, setCurrentJobId] = useState<string | null>(() => safeLocalStorageGetItem(localStorageKey.JOB_ID, null));
+  const { toast } = useToast();
   // Lifted state from CrawlStatusMonitor
-  const [jobStatus, setJobStatus] = useState<CrawlJobStatus | null>(null);
-  const [jobError, setJobError] = useState<string | null>(null);
-  const [isPollingLoading, setIsPollingLoading] = useState<boolean>(false);
+  const [jobStatus, setJobStatus] = useState<CrawlJobStatus | null>(() => safeLocalStorageGetItem(localStorageKey.JOB_STATUS, null));
+  const [jobError, setJobError] = useState<string | null>(null); // Transient state
+  const [isPollingLoading, setIsPollingLoading] = useState<boolean>(false); // Transient state
   // State lifted for selective crawl
-  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
-  const [isCrawlingSelected, setIsCrawlingSelected] = useState<boolean>(false);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(() => {
+      const storedArray = safeLocalStorageGetItem(localStorageKey.SELECTED_URLS, []);
+      return new Set(Array.isArray(storedArray) ? storedArray : []); // Ensure it's an array before creating Set
+  });
+  const [isCrawlingSelected, setIsCrawlingSelected] = useState<boolean>(false); // Transient state
+  const [isCancelling, setIsCancelling] = useState<boolean>(false); // Added state for cancellation UI
+
+  // --- LocalStorage Persistence (Saving Logic - defined earlier) ---
+  // Removed duplicate declarations of LOCALSTORAGE_VERSION and localStorageKey
+
+  // Helper function for safe localStorage setItem
+  const safeLocalStorageSetItem = useCallback((key: string, value: any) => {
+    try {
+      const dataToStore = JSON.stringify({ version: LOCALSTORAGE_VERSION, data: value });
+      localStorage.setItem(key, dataToStore);
+    } catch (error) {
+      console.error(`Error saving state to localStorage (key: ${key}):`, error);
+      // Optionally, show a toast notification about storage issues
+      // toast({ title: "Storage Error", description: `Could not save state for ${key}. Storage might be full.`, variant: "destructive" });
+    }
+  }, []); // No dependencies, function is stable
+
+  // Save currentJobId
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      safeLocalStorageSetItem(localStorageKey.JOB_ID, currentJobId);
+    }
+  }, [currentJobId, safeLocalStorageSetItem, localStorageKey.JOB_ID]);
+
+  // Save jobStatus
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      safeLocalStorageSetItem(localStorageKey.JOB_STATUS, jobStatus);
+    }
+  }, [jobStatus, safeLocalStorageSetItem, localStorageKey.JOB_STATUS]);
+
+  // Save selectedUrls (convert Set to Array)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      safeLocalStorageSetItem(localStorageKey.SELECTED_URLS, Array.from(selectedUrls));
+    }
+  }, [selectedUrls, safeLocalStorageSetItem, localStorageKey.SELECTED_URLS]);
+
+  // Save url input value
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      safeLocalStorageSetItem(localStorageKey.URL_INPUT, url);
+    }
+  }, [url, safeLocalStorageSetItem, localStorageKey.URL_INPUT]);
+
+  // Save discoveredPages (potentially large)
+  useEffect(() => {
+    // Avoid saving during initial discovery phase if it's empty or resetting
+    if (typeof window !== 'undefined' && discoveredPages.length > 0) {
+       safeLocalStorageSetItem(localStorageKey.DISCOVERED_PAGES, discoveredPages);
+    } else if (typeof window !== 'undefined' && discoveredPages.length === 0 && localStorage.getItem(localStorageKey.DISCOVERED_PAGES)) {
+       // If discoveredPages is reset to empty, remove from storage
+       localStorage.removeItem(localStorageKey.DISCOVERED_PAGES);
+    }
+  }, [discoveredPages, safeLocalStorageSetItem, localStorageKey.DISCOVERED_PAGES]);
+
+  // --- End LocalStorage Persistence (Saving Logic) ---
+
+  // --- Revalidation Logic ---
+  useEffect(() => {
+    const initialJobId = safeLocalStorageGetItem(localStorageKey.JOB_ID, null);
+    const initialJobStatus: CrawlJobStatus | null = safeLocalStorageGetItem(localStorageKey.JOB_STATUS, null);
+
+    if (initialJobId && initialJobStatus) {
+      const ongoingStates: OverallStatus[] = ['discovering', 'crawling', 'cancelling']; // States that might be stale
+      if (ongoingStates.includes(initialJobStatus.overall_status)) {
+        console.log(`(Page Hydration) Revalidating status for ongoing job ${initialJobId} (status: ${initialJobStatus.overall_status})`);
+        // Define async function inside useEffect
+        const revalidateStatus = async () => {
+          try {
+            const response = await fetch(`/api/crawl-status/${initialJobId}`);
+            const latestStatus: CrawlJobStatus = await response.json();
+            if (response.ok) {
+              console.log(`(Page Hydration) Revalidated status for job ${initialJobId}:`, latestStatus.overall_status);
+              setJobStatus(latestStatus); // Update state with fresh status
+            } else {
+              console.warn(`(Page Hydration) Failed to revalidate status for job ${initialJobId}: ${response.status} - ${latestStatus.error || 'Unknown error'}`);
+              // Optionally handle error, maybe clear state if 404?
+              if (response.status === 404) {
+                 setCurrentJobId(null);
+                 setJobStatus(null);
+                 // Clear relevant localStorage?
+                 localStorage.removeItem(localStorageKey.JOB_ID);
+                 localStorage.removeItem(localStorageKey.JOB_STATUS);
+              }
+            }
+          } catch (err) {
+            console.error(`(Page Hydration) Network error revalidating status for job ${initialJobId}:`, err);
+          }
+        };
+        // Call the async function
+        revalidateStatus();
+      }
+    }
+    // Run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // --- End Revalidation Logic ---
+
 
   const handleSubmit = async (submittedUrl: string, depth: number) => {
     if (!validateUrl(submittedUrl)) {
@@ -64,7 +197,22 @@ export default function Home() {
     setMarkdown('')
     setDiscoveredPages([])
     setCurrentJobId(null); // Reset job ID for new discovery
-    
+    setJobStatus(null); // Explicitly reset job status state
+    setSelectedUrls(new Set()); // Reset selected URLs state
+
+    // --- Clear relevant localStorage on new discovery ---
+    if (typeof window !== 'undefined') {
+        console.log("Clearing localStorage for new discovery...");
+        localStorage.removeItem(localStorageKey.JOB_ID);
+        localStorage.removeItem(localStorageKey.JOB_STATUS);
+        localStorage.removeItem(localStorageKey.SELECTED_URLS);
+        localStorage.removeItem(localStorageKey.DISCOVERED_PAGES);
+        // Keep URL_INPUT? Maybe, maybe not. Let's clear it for now.
+        // localStorage.removeItem(localStorageKey.URL_INPUT);
+        // Remove version key as well? No, keep it to check on next load.
+    }
+    // --- End Clear localStorage ---
+
     try {
       console.log('Initiating discovery for:', submittedUrl, 'with depth:', depth)
       // Call updated service function, expect jobId back
@@ -252,6 +400,57 @@ const handleCrawlSelectedClick = async () => {
 
   }; // Added back closing brace for handleCrawlSelectedClick
 
+  // --- Cancel Crawl Handler ---
+  const handleCancelCrawl = async () => {
+    if (!currentJobId) {
+      toast({ title: "Error", description: "No active job to cancel.", variant: "destructive" });
+      return;
+    }
+    if (isCancelling) {
+      return; // Prevent double clicks
+    }
+
+    setIsCancelling(true);
+    console.log(`(Page) Initiating cancellation for job ${currentJobId}`);
+    try {
+      const response = await fetch(`/api/crawl-cancel/${currentJobId}`, {
+        method: 'POST',
+      });
+
+      const result = await response.json(); // Attempt to parse JSON regardless of status
+
+      if (!response.ok) {
+        // Use detail from backend response if available, otherwise use status text
+        const errorDetail = result?.detail || response.statusText || `HTTP error ${response.status}`;
+        throw new Error(errorDetail);
+      }
+
+      // Success: Update local status immediately for responsiveness
+      setJobStatus(prevStatus => prevStatus ? { ...prevStatus, overall_status: 'cancelling' } : null);
+      toast({
+        title: "Cancellation Requested",
+        description: `Sent cancellation request for job ${currentJobId}. Status will update shortly.`,
+      });
+      // Button remains disabled via isCancelling state and eventually status change
+
+      // Optional: Trigger an immediate status fetch? Polling should pick it up anyway.
+      // fetchStatus(); // Consider if needed for faster feedback than polling interval
+
+    } catch (error) {
+      console.error(`(Page) Error cancelling job ${currentJobId}:`, error);
+      toast({
+        title: "Cancellation Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+      // Re-enable button only if it was a potentially recoverable error?
+      // For now, let the status polling eventually correct the UI state.
+    } finally {
+      setIsCancelling(false); // Reset cancelling state after attempt
+    }
+  };
+  // --- End Cancel Crawl Handler ---
+
   // --- Lifted Polling Logic from CrawlStatusMonitor ---
   useEffect(() => {
     // Clear previous status and error when jobId changes or becomes null
@@ -337,7 +536,7 @@ const handleCrawlSelectedClick = async () => {
       <header className="w-full py-12 bg-gradient-to-r from-gray-900/50 to-gray-800/50 backdrop-blur-sm border-b border-gray-700">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-4">
-            DevDocs by CyberAGI Inc
+            DevDocs by CyberAGI
           </h1>
           <p className="text-gray-300 text-lg max-w-2xl mx-auto">
             Discover and extract documentation for quicker development
@@ -412,6 +611,10 @@ const handleCrawlSelectedClick = async () => {
               onSelectionChange={handleSelectionChange}
               onCrawlSelected={handleCrawlSelectedClick}
               isCrawlingSelected={isCrawlingSelected}
+              // Pass new props for cancellation
+              onCancelCrawl={handleCancelCrawl}
+              overallStatus={jobStatus?.overall_status ?? null} // Pass overall status from jobStatus
+              isCancelling={isCancelling}
             />
           </div>
         )}

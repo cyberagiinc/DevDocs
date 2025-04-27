@@ -46,6 +46,8 @@ export type OverallStatus =
   | 'discovering'
   | 'discovery_complete'
   | 'crawling'
+  | 'cancelling' // Added for kill switch
+  | 'cancelled' // Added for kill switch
   | 'completed'
   | 'completed_with_errors' // Added based on crawler.py logic
   | 'error';
@@ -58,13 +60,18 @@ export type UrlStatus =
   | 'crawling'
   | 'crawl_error'
   | 'completed';
+// Interface for detailed URL status including HTTP status code
+export interface UrlDetails {
+  status: UrlStatus;
+  statusCode: number | null; // HTTP status code, null if not applicable/available
+}
 
 // Interface for the job status object returned by /api/crawl-status/{job_id}
 export interface CrawlJobStatus {
   job_id: string;
   root_url: string; // Added based on backend implementation
   overall_status: OverallStatus;
-  urls: Record<string, UrlStatus>; // Dictionary mapping URL string to its status
+  urls: Record<string, UrlDetails>; // Dictionary mapping URL string to its detailed status
   start_time?: string; // ISO 8601 datetime string
   end_time?: string; // ISO 8601 datetime string
   error?: string | null;
@@ -94,12 +101,16 @@ export interface CrawlResponse {
 
 // --- Props for CrawlUrls Component ---
 export interface CrawlUrlsProps {
-  urls: Record<string, UrlStatus>; // Use existing UrlStatus type
+  urls: Record<string, UrlDetails>; // Use new UrlDetails type
   selectedUrls: Set<string>;
   onSelectionChange: (newSelectedUrls: Set<string>) => void;
   onCrawlSelected: () => void;
   isCrawlingSelected: boolean;
-  jobId: string | null; // Note: This might need changing to job_id if backend expects snake_case here too
+  jobId: string | null;
+  // Added for Cancel Button
+  onCancelCrawl: () => void;
+  overallStatus: OverallStatus | null; // Needed to determine if cancellation is possible
+  isCancelling: boolean; // To disable button during cancellation request
 }
 
 // --- Types for MCP Settings ---
