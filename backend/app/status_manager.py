@@ -51,6 +51,7 @@ class UrlDetails(BaseModel):
     """Represents the status and details of a specific URL within a job."""
     status: str
     statusCode: Optional[int] = None
+    errorMessage: Optional[str] = None # Added field for specific URL errors
 
 class CrawlJobStatus(BaseModel):
     """Represents the status of a discovery and crawl job."""
@@ -154,8 +155,8 @@ def update_overall_status(job_id: str, status: str, error_message: Optional[str]
     else:
         logger.error(f"Attempted to update overall status for non-existent job ID: {job_id}")
 
-def update_url_status(job_id: str, url: str, status: str, statusCode: Optional[int] = None): # Added statusCode parameter
-    """Updates the status and optionally the HTTP status code of a specific URL within a job."""
+def update_url_status(job_id: str, url: str, status: str, statusCode: Optional[int] = None, error_message: Optional[str] = None): # Added statusCode and error_message parameters
+    """Updates the status, optionally the HTTP status code, and optionally an error message of a specific URL within a job."""
     # Use the managed dict
     if job_id in crawl_jobs:
         try:
@@ -173,7 +174,7 @@ def update_url_status(job_id: str, url: str, status: str, statusCode: Optional[i
             normalized_url = normalize_url(url)
             if current_status.urls is None: # Should not happen with default_factory
                  current_status.urls = {}
-            current_status.urls[normalized_url] = UrlDetails(status=status, statusCode=statusCode) # Store UrlDetails object
+            current_status.urls[normalized_url] = UrlDetails(status=status, statusCode=statusCode, errorMessage=error_message) # Store UrlDetails object including error message
 
             # Convert back to dict
             try:
@@ -184,9 +185,10 @@ def update_url_status(job_id: str, url: str, status: str, statusCode: Optional[i
             # Reassign dict
             crawl_jobs[job_id] = updated_status_data
 
-            logger.debug(f"Job {job_id} URL status updated: {normalized_url} -> status={status}, statusCode={statusCode}") # Updated log message
+            log_extra = f", error='{error_message}'" if error_message else ""
+            logger.debug(f"Job {job_id} URL status updated: {normalized_url} -> status={status}, statusCode={statusCode}{log_extra}") # Updated log message
         except Exception as e:
-             logger.error(f"Error updating URL status in managed dict for job {job_id}: {e}", exc_info=True)
+             logger.error(f"Error updating URL status ({normalized_url}) in managed dict for job {job_id}: {e}", exc_info=True)
     else:
         logger.error(f"Attempted to update URL status for non-existent job ID: {job_id}")
 

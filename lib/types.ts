@@ -64,6 +64,7 @@ export type UrlStatus =
 export interface UrlDetails {
   status: UrlStatus;
   statusCode: number | null; // HTTP status code, null if not applicable/available
+  errorMessage?: string | null; // Specific error message for this URL, if any
 }
 
 // Interface for the job status object returned by /api/crawl-status/{job_id}

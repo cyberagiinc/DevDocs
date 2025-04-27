@@ -268,27 +268,30 @@ async def discover_pages(
                     error_msg = status.get('error', 'Unknown error')
                     logger.error(f"Link discovery task {task_id} for {url} failed: {error_msg} (Job ID: {job_id})")
                     if job_id:
-                        update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None) # Add statusCode=None
+                        update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None, error_message=error_msg) # Pass error message
                     result = None # Ensure result is None on failure
                     logger.info(f"[Polling Debug] Exiting poll loop for task {task_id} - FAILED (Job ID: {job_id})") # DEBUG LOG EXIT
                     break # Exit polling loop on failure
                 # Continue polling if status is 'running' or other non-terminal state
 
             if result is None and status["status"] != "failed": # Check if loop finished without success or explicit failure
-                 logger.warning(f"Timeout waiting for link discovery result for {url} (Task ID: {task_id}, Job ID: {job_id})")
+                 timeout_error_msg = f"Timeout waiting for link discovery result (Task ID: {task_id})"
+                 logger.warning(f"{timeout_error_msg} for {url} (Job ID: {job_id})")
                  if job_id:
-                     update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None) # Add statusCode=None
+                     update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None, error_message=timeout_error_msg) # Pass timeout message
                      logger.warning(f"[Polling Debug] Exiting poll loop for task {task_id} - TIMEOUT (Job ID: {job_id})") # DEBUG LOG EXIT TIMEOUT
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed during link discovery for {url}: {str(e)}", exc_info=True)
+            request_error_msg = f"Request failed during link discovery: {str(e)}"
+            logger.error(f"{request_error_msg} for {url}", exc_info=True)
             if job_id:
-                update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None) # Add statusCode=None
+                update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None, error_message=request_error_msg) # Pass request error message
             result = None # Ensure result is None on request error
         except Exception as e:
-            logger.error(f"Unexpected error during link discovery for {url}: {str(e)}", exc_info=True)
+            unexpected_error_msg = f"Unexpected error during link discovery: {str(e)}"
+            logger.error(f"{unexpected_error_msg} for {url}", exc_info=True)
             if job_id:
-                update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None) # Add statusCode=None
+                update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None, error_message=unexpected_error_msg) # Pass unexpected error message
             result = None # Ensure result is None on other errors
             logger.error(f"[Polling Debug] Exiting poll loop for task {task_id} due to unexpected error during discovery request/polling. (Job ID: {job_id})") # DEBUG LOG EXIT ERROR
         # --- End: Re-added crawl4ai call for link discovery ONLY ---
@@ -391,8 +394,8 @@ async def discover_pages(
         error_message = f"Error discovering pages starting from {url}: {str(e)}"
         logger.error(error_message, exc_info=True)
         if job_id:
-            # Mark current URL as error
-            update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None) # Add statusCode=None
+            # Mark current URL as error, passing the captured message
+            update_url_status(job_id, normalize_url(url), 'discovery_error', statusCode=None, error_message=error_message)
             # Mark overall job as error only if it's the root call failing
             if current_depth == 1:
                  update_overall_status(job_id, 'error', error_message)
@@ -689,7 +692,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                             error_msg = status.get('error', 'Unknown error')
                             logger.error(f"Content crawl task {task_id} for {url} failed: {error_msg} (Job ID: {job_id})")
                             if job_id:
-                                update_url_status(job_id, url, 'crawl_error', statusCode=None) # Add statusCode=None
+                                update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message=error_msg) # Pass error message
                             result = None # Ensure result is None on failure
                             break # Exit polling loop on failure
                         elif status["status"] == "running":
@@ -709,9 +712,10 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
 
                 # Check if polling loop finished without success or explicit failure (timeout or other issue)
                 if result is None and status["status"] != "failed":
-                    logger.warning(f"Timeout or issue waiting for content crawl result for {url} (Task ID: {task_id}, Job ID: {job_id})")
+                    timeout_error_msg = f"Timeout or issue waiting for content crawl result (Task ID: {task_id})"
+                    logger.warning(f"{timeout_error_msg} for {url} (Job ID: {job_id})")
                     if job_id:
-                        update_url_status(job_id, url, 'crawl_error', statusCode=None) # Add statusCode=None
+                        update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message=timeout_error_msg) # Pass timeout message
                     errors += 1
                     page.status = "error"
                     continue # Move to the next page
@@ -723,7 +727,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                     errors += 1
                     page.status = "error"
                     if job_id:
-                        update_url_status(job_id, url, 'crawl_error', statusCode=None) # Add statusCode=None
+                        update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message="Logic error: Result was None during processing") # Pass specific message
                     continue
 
                 # Correct indentation for this block
@@ -771,13 +775,13 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                         errors += 1
                         page.status = "error" # Keep local status for stats
                         if job_id:
-                            update_url_status(job_id, url, 'crawl_error', statusCode=None) # Mark as error in global status, add statusCode=None
+                            update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message="Filtered content was empty") # Pass specific message
                 else:
                     logger.warning(f"Skipping {url} - no markdown content available (Job ID: {job_id})")
                     errors += 1
                     page.status = "error" # Keep local status for stats
                     if job_id:
-                        update_url_status(job_id, url, 'crawl_error', statusCode=None) # Mark as error in global status, add statusCode=None
+                        update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message="No markdown content available in result") # Pass specific message
 
             except Exception as e:
                 error_message = f"Error crawling page {url}: {str(e)}" # Use normalized URL in log
@@ -785,7 +789,7 @@ async def crawl_pages(pages: List[DiscoveredPage], root_url: str = None, job_id:
                 errors += 1
                 page.status = "error" # Keep local status for stats
                 if job_id:
-                    update_url_status(job_id, url, 'crawl_error', statusCode=None) # Mark as error in global status, add statusCode=None
+                    update_url_status(job_id, url, 'crawl_error', statusCode=None, error_message=error_message) # Pass captured exception message
         # End of main page loop
 
         combined_markdown = "".join(all_markdown)

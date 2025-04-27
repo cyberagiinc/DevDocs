@@ -299,9 +299,13 @@ const CrawlUrls: React.FC<CrawlUrlsProps> = ({
                             );
                           })()}
                         </TooltipTrigger>
-                        <TooltipContent className="bg-black text-white"> {/* Black bg, white text */}
-                           {/* Use status from details object */}
-                          <p>{getStatusTooltip(details.status)}</p>
+                        <TooltipContent className="bg-black text-white max-w-xs break-words"> {/* Black bg, white text, constrain width */}
+                          {/* Conditionally display specific error or generic tooltip */}
+                          {(details.status === 'discovery_error' || details.status === 'crawl_error') && details.errorMessage ? (
+                            <p className="text-red-400">{details.errorMessage}</p> // Show specific error
+                          ) : (
+                            <p>{getStatusTooltip(details.status)}</p> // Fallback to generic status description
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
