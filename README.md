@@ -15,13 +15,24 @@
     <a href="#-getting-started">Getting Started</a> •
     <a href="#-scripts-and-their-purpose">Scripts</a> •
     <a href="#-pricing-comparison">Compare to FireCrawl</a> •
-    <a href="#-join-our-community">Discord</a>
+    <a href="#-join-our-community">Discord</a> •
+    <a href="#-devdocs-roadmap">DevDocs Roadmap</a>
   </p>
 </div>
 
-<a href="https://trackgit.com">
-<img src="https://us-central1-trackgit-analytics.cloudfunctions.net/token/ping/m9io6qxdhz9wzpdse4vm" alt="trackgit-views" />
-</a>
+## 🚀 Technology Partners
+
+<div align="center" style="display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap; padding: 20px 0;">
+
+  <img src="https://cdn.brandfetch.io/idmJWF3N06/theme/light/symbol.svg?c=1dxbfHSJFAPEGdCLU4o5B" alt="Anthropic" style="height: 60px; max-width: 150px; object-fit: contain;" />
+  
+  <img src="https://cdn.brandfetch.io/idR3duQxYl/w/800/h/810/theme/light/symbol.png?c=1dxbfHSJFAPEGdCLU4o5B" alt="OpenAI" style="height: 60px; max-width: 150px; object-fit: contain;" />
+  
+  <img src="assets/image-8.png" alt="CyberAGI" style="height: 60px; max-width: 150px; object-fit: contain;" />
+  
+  <img src="https://raw.githubusercontent.com/unclecode/crawl4ai/main/docs/assets/powered-by-disco.svg" alt="Crawl4AI" style="height: 60px; max-width: 150px; object-fit: contain;" />
+
+</div>
 
 ## 🎯 Perfect For
 
@@ -334,16 +345,7 @@ Final Output Construction: The final answer should be organized, directly addres
 
 "Launched my SaaS in half the time by using DevDocs to understand and implement new technologies quickly." - *Successful Indie Hacker*
 
-
-## 📝 Technology Partners
-
-<img src="assets/image-6.png" width="200" height="100"> <img src="assets/image-7.png" width="250" height="100"> <img src="assets/image-8.png" width="300" height="100">
-
-Certainly! Below is your DevDocs roadmap formatted with Markdown checkboxes, suitable for integration into your GitHub README. This format allows you to track progress by marking tasks as completed ([x]) or pending ([ ]).
-
-⸻
-
-🛣️ DevDocs Roadmap
+## 🛣️ DevDocs Roadmap
 
 This roadmap outlines the upcoming enhancements and features planned for DevDocs, our advanced web crawling platform powered by Crawl4AI. Each item is designed to leverage Crawl4AI’s capabilities to their fullest, ensuring a robust, efficient, and user-friendly web crawling experience.
 
