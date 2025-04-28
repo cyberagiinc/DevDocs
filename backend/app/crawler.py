@@ -224,8 +224,22 @@ async def discover_pages(
             logger.info(f"Submitted link discovery task for {url}, task ID: {task_id} (Job ID: {job_id})")
 
             # Poll for result
-            max_attempts = 120
-            poll_interval = 1
+            # --- Configurable Polling Timeout ---
+            poll_interval = 1 # Define poll interval (seconds)
+            default_timeout = 300
+            discovery_timeout_str = os.environ.get("DISCOVERY_POLLING_TIMEOUT_SECONDS", str(default_timeout))
+            try:
+                discovery_timeout = int(discovery_timeout_str)
+                if discovery_timeout <= 0:
+                    logger.warning(f"Invalid DISCOVERY_POLLING_TIMEOUT_SECONDS value '{discovery_timeout_str}', using default {default_timeout}s.")
+                    discovery_timeout = default_timeout
+            except ValueError:
+                logger.warning(f"Non-integer DISCOVERY_POLLING_TIMEOUT_SECONDS value '{discovery_timeout_str}', using default {default_timeout}s.")
+                discovery_timeout = default_timeout
+
+            max_attempts = int(discovery_timeout / poll_interval) # Calculate max_attempts based on timeout and interval
+            logger.info(f"Using discovery polling timeout: {discovery_timeout} seconds ({max_attempts} attempts at {poll_interval}s interval)")
+            # --- End Configurable Polling Timeout ---
             logger.info(f"[Polling Debug] Starting polling for task {task_id} (URL: {url}, Job ID: {job_id})") # DEBUG LOG START
             for attempt in range(max_attempts):
                 # --- Cancellation Check (Polling Loop) ---

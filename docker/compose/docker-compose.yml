@@ -32,6 +32,7 @@ services:
       - MCP_HOST=mcp
       - CRAWL4AI_URL=http://crawl4ai:11235
       - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-devdocs-demo-key}
+      - DISCOVERY_POLLING_TIMEOUT_SECONDS=${DISCOVERY_POLLING_TIMEOUT_SECONDS:-300} # Add discovery timeout
     depends_on:
       - crawl4ai
       - mcp
