@@ -32,7 +32,7 @@ const ConsolidatedFiles: React.FC<ConsolidatedFilesProps> = () => {
 
     try {
       console.log('Polling file list from: /api/all-files');
-      const response = await fetch('/api/all-files');
+      const response = await fetch('/api/all-files', { cache: 'no-store' });
 
       if (!response.ok) {
         // Don't necessarily clear files on a failed poll, maybe show stale data + error?
