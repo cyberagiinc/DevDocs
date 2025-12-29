@@ -599,7 +599,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["file_id"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Sync File",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="get_status",
@@ -607,7 +611,11 @@ class FastMarkdownServer:
                     inputSchema={
                         "type": "object",
                         "properties": {}
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Get Status",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="list_files",
@@ -615,7 +623,11 @@ class FastMarkdownServer:
                     inputSchema={
                         "type": "object",
                         "properties": {}
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="List Files",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="read_file",
@@ -629,7 +641,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["file_id"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Read File",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="search_files",
@@ -643,7 +659,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["query"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Search Files",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="search_by_tag",
@@ -657,7 +677,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["tag"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Search by Tag",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="get_stats",
@@ -665,7 +689,11 @@ class FastMarkdownServer:
                     inputSchema={
                         "type": "object",
                         "properties": {}
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Get Stats",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="get_section",
@@ -683,7 +711,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["file_id", "section_id"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Get Section",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="get_table_of_contents",
@@ -697,7 +729,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["file_id"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Get Table of Contents",
+                        readOnlyHint=True,
+                    )
                 ),
                 types.Tool(
                     name="smart_section_search",
@@ -723,7 +759,11 @@ class FastMarkdownServer:
                             }
                         },
                         "required": ["query"]
-                    }
+                    },
+                    annotations=types.ToolAnnotations(
+                        title="Smart Section Search",
+                        readOnlyHint=True,
+                    )
                 )
             ]
 
