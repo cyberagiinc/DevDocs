@@ -158,7 +158,7 @@ To try out the function call feature of Claude model, you need to install `anthr
 
 Tip
 
-If you have been using `autogen` or `pyautogen`, all you need to do is upgrade it using: 
+If you have been using `autogen` or `ag2`, all you need to do is upgrade it using: 
 
 ```
 `[](#__codelineno-1-1)pipinstall-Uautogen[anthropic] `
@@ -167,10 +167,10 @@ If you have been using `autogen` or `pyautogen`, all you need to do is upgrade i
 or 
 
 ```
-`[](#__codelineno-2-1)pipinstall-Upyautogen[anthropic] `
+`[](#__codelineno-2-1)pipinstall-Uag2[anthropic] `
 ```
 
-as `pyautogen`, `autogen`, and `ag2` are aliases for the same PyPI package. 
+as `ag2`, `autogen`, and `ag2` are aliases for the same PyPI package. 
 
 ## Set the config for the Anthropic API[#](#set-the-config-for-the-anthropic-api "Permanent link")
 
@@ -2861,7 +2861,7 @@ AG2 requires **Python version >= 3.9, < 3.14**. Install AG2 with OpenAI integrat
 `[](#__codelineno-0-1)pipinstallag2[openai] `
 ```
 
-The package is available under `ag2`, `pyautogen`, or `autogen` names. The default installation includes minimal dependencies, you can add extra options based on your specific requirements.
+The package is available under `ag2`, `ag2`, or `autogen` names. The default installation includes minimal dependencies, you can add extra options based on your specific requirements.
 
 Warning
 
@@ -6621,7 +6621,7 @@ To try out the function call feature of Claude model, you need to install `anthr
 
 Tip
 
-If you have been using `autogen` or `pyautogen`, all you need to do is upgrade it using: 
+If you have been using `autogen` or `ag2`, all you need to do is upgrade it using: 
 
 ```
 `[](#__codelineno-1-1)pipinstall-Uautogen[anthropic] `
@@ -6630,10 +6630,10 @@ If you have been using `autogen` or `pyautogen`, all you need to do is upgrade i
 or 
 
 ```
-`[](#__codelineno-2-1)pipinstall-Upyautogen[anthropic] `
+`[](#__codelineno-2-1)pipinstall-Uag2[anthropic] `
 ```
 
-as `pyautogen`, `autogen`, and `ag2` are aliases for the same PyPI package. 
+as `ag2`, `autogen`, and `ag2` are aliases for the same PyPI package. 
 
 ## Set the config for the Anthropic API[#](#set-the-config-for-the-anthropic-api "Permanent link")
 
