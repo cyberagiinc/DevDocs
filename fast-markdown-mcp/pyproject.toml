@@ -11,7 +11,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.2.0",
+    "mcp>=1.8.0",
     "watchdog>=3.0.0",
     "markdown>=3.4.0",
     "anyio>=4.0.0",
