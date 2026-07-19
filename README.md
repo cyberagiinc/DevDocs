@@ -234,7 +234,7 @@ DevDocs is more than a tool—it's your documentation companion that:
 ## 🛠️ Setting Up the Cline/Roo Cline for Rapid software development.
 
 1. **Open the "Modes" Interface**  
-   - In **Roo Code**, click the **+** to create a new Mode-Specific Prompts.
+   - In **Roo Code** or **[Zoo Code](https://zoocode.dev/)**, click the **+** to create a new Mode-Specific Prompts.
    <br>
    
 2. **Name**  
